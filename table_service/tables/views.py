@@ -3,25 +3,25 @@ from django.db import transaction
 from django.db.models import F, Value, TextField, Subquery, OuterRef, Q
 from django.db.models.functions import Concat
 from django.contrib.auth.models import User
-from django.shortcuts import render, redirect, get_object_or_404, reverse
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseForbidden
 from django.template.loader import render_to_string
-from django_tables2.export import ExportMixin, TableExport
-
+from django_tables2.export import TableExport
 from .models import Table, Column, Row, Cell, RowPermission, Filial, Employee, RowFilialPermission, TablePermission, \
-    TableFilialPermission, TableFilialLock, Admin
-from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm
+    TableFilialPermission, TableFilialLock, Admin, ColumnPermission, ColumnFilialPermission
+from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, ColumnPermissionUserForm, ColumnPermissionFilialForm, \
+    ColumnPermissionForm, ColumnFilialPermissionForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
-from django_tables2 import RequestConfig, SingleTableView
+from django_tables2 import RequestConfig
 from .tables import DynamicTable, ExportTable
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_POST
 
 
-def save_row_data(table, row, form):
+def save_row_data(row, form, columns):
     """Сохраняет данные строки из формы"""
-    for column in table.columns.all():
+    for column in columns:
         field_name = f'col_{column.id}'
         value = form.cleaned_data[field_name]
 
@@ -100,32 +100,205 @@ def add_column(request, pk):
     if request.method == 'POST':
         form = ColumnForm(request.POST)
         if form.is_valid():
-            column = form.save(commit=False)
-            column.table = table
-            column.order = table.columns.count()
-            column.save()
-            messages.success(request, f'Колонка "{column.name}" успешно добавлена')
-            return redirect('table_detail', pk=table.pk)
+            with transaction.atomic():
+                column = form.save(commit=False)
+                column.table = table
+                column.order = table.columns.count()
+                column.save()
+
+                permissions_to_create = []
+
+                # Все обычные пользователи
+                users = User.objects.exclude(
+                    Q(pk=table.owner.pk) |
+                    Q(admin__isnull=False) |
+                    Q(profile__employee__id_filial=1910)
+                )
+
+                permissions_to_create.extend([
+                    ColumnPermission(
+                        column=column,
+                        user=user,
+                        permission_type=ColumnPermission.PermissionType.VIEW_ONLY
+                    ) for user in users
+                ])
+
+                # Администраторы и филиал администрации
+                admin_users = User.objects.filter(
+                    Q(pk=table.owner.pk) |
+                    Q(admin__isnull=False) |
+                    Q(profile__employee__id_filial=1910)
+                )
+                permissions_to_create.extend([
+                    *[ColumnPermission(
+                        column=column,
+                        user=admin,
+                        permission_type=ColumnPermission.PermissionType.EDIT_VIEW
+                    ) for admin in admin_users]
+                ])
+
+                # Массовое создание всех прав доступа
+                ColumnPermission.objects.bulk_create(
+                    permissions_to_create,
+                    batch_size=1000  # Оптимальный размер партии
+                )
+
+                # Овнер таблицы
+                ColumnPermission.objects.update_or_create(
+                    column=column,
+                    user=table.owner,
+                    permission_type=ColumnPermission.PermissionType.EDIT_VIEW
+                ),
+
+                messages.success(request, f'Колонка "{column.name}" успешно добавлена')
+                return redirect('table_detail', pk=table.pk)
     else:
         form = ColumnForm()
     return render(request, 'tables/add_column/add_column.html', {'form': form, 'table': table})
 
 
 @login_required
+def manage_column_permissions(request, table_pk, column_pk):
+    table = get_object_or_404(Table, pk=table_pk)
+    column = get_object_or_404(Column, pk=column_pk, table=table)
+
+    if request.method == 'POST':
+        print(request.POST)
+        if 'update_user' in request.POST:
+            with transaction.atomic():
+                user_id = int(request.POST['update_user'])
+                perm = column.permissions.get(user_id=user_id, column_id=column_pk)
+                field_name = f'user_{perm.user.id}-permission_type'
+                if field_name in request.POST:
+                    perm.permission_type = request.POST[field_name]
+                    perm.save()
+                messages.success(request, 'Права пользователей обновлены')
+
+        elif 'remove_user' in request.POST:
+            with transaction.atomic():
+                user_id = request.POST.get('user_id')
+                if user_id:
+                    column.permissions.filter(user_id=user_id).delete()
+                    messages.success(request, 'Права пользователя удалены')
+
+        elif 'add_user' in request.POST:
+            with transaction.atomic():
+                user_id = request.POST.get('user')
+                permission_type = request.POST.get('permission_type')
+                if user_id and permission_type:
+                    ColumnPermission.objects.update_or_create(
+                        column=column,
+                        user_id=user_id,
+                        defaults={'permission_type': permission_type}
+                    )
+                    messages.success(request, 'Права пользователя добавлены')
+
+        elif 'update_filial' in request.POST:
+            with transaction.atomic():
+                filial_id = int(request.POST['update_filial'])
+                perm = column.filial_permissions.get(filial_id=filial_id, column_id=column_pk)
+                field_name = f'filial_{perm.filial.id}-permission_type'
+                if field_name in request.POST:
+                    perm.permission_type = request.POST[field_name]
+                    perm.save()
+
+                users = User.objects.filter(
+                    profile__employee__id_filial=filial_id
+                )
+                for user in users:
+                    ColumnPermission.objects.update_or_create(
+                        column=column,
+                        user=user,
+                        defaults={'permission_type': perm.permission_type}
+                    )
+                messages.success(request, 'Права филиала обновлены')
+
+        elif 'remove_filial' in request.POST:
+            with transaction.atomic():
+                filial_id = request.POST.get('filial_id')
+                if filial_id:
+                    column.filial_permissions.filter(filial_id=filial_id).delete()
+
+                    users = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+
+                    for user in users:
+                        ColumnPermission.objects.filter(
+                            column=column,
+                            user=user,
+                        ).delete()
+
+                    messages.success(request, 'Права филиала удалены')
+
+        elif 'add_filial' in request.POST:
+            with transaction.atomic():
+                filial_id = request.POST.get('filial')
+                permission_type = request.POST.get('permission_type')
+                if filial_id and permission_type:
+                    ColumnFilialPermission.objects.update_or_create(
+                        column=column,
+                        filial_id=filial_id,
+                        defaults={'permission_type': permission_type}
+                    )
+                    users = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+                    for user in users:
+                        ColumnPermission.objects.update_or_create(
+                            column=column,
+                            user=user,
+                            defaults={'permission_type': permission_type}
+                        )
+
+                    messages.success(request, 'Права филиала добавлены')
+
+        return redirect('manage_column_permissions', table_pk=table.pk, column_pk=column.pk)
+
+    # Получаем текущие права
+    user_permissions = []
+    for perm in column.permissions.all():
+        perm.form = ColumnPermissionForm(initial={
+            'permission_type': perm.permission_type
+        }, prefix=f'user_{perm.user.id}')
+        user_permissions.append(perm)
+
+    filial_permissions = []
+    for perm in column.filial_permissions.all():
+        perm.form = ColumnFilialPermissionForm(initial={
+            'permission_type': perm.permission_type
+        }, prefix=f'filial_{perm.filial.id}')
+        filial_permissions.append(perm)
+
+    context = {
+        'table': table,
+        'column': column,
+        'permissions': user_permissions,
+        'filial_permissions': filial_permissions,
+        'user_form': ColumnPermissionUserForm(table=table),
+        'filial_form': ColumnPermissionFilialForm(table=table),
+    }
+
+    return render(request, 'tables/manage_column_permissions.html', context)
+
+
+@login_required
 def manage_admins(request):
     if request.method == 'POST':
         if 'add_admin' in request.POST:
-            user_id = request.POST.get('new_admin')
-            if user_id:
-                user = get_object_or_404(User, pk=user_id)
-                Admin.objects.get_or_create(user=user)
-                messages.success(request, f'{user.username} добавлен как администратор')
+            with transaction.atomic():
+                user_id = request.POST.get('new_admin')
+                if user_id:
+                    user = get_object_or_404(User, pk=user_id)
+                    Admin.objects.get_or_create(user=user)
+                    messages.success(request, f'{user.username} добавлен как администратор')
 
         if 'remove_admin' in request.POST:
-            admin_id = request.POST.get('admin_id')
-            if admin_id:
-                Admin.objects.filter(pk=admin_id).delete()
-                messages.success(request, 'Администратор удален')
+            with transaction.atomic():
+                admin_id = request.POST.get('admin_id')
+                if admin_id:
+                    Admin.objects.filter(pk=admin_id).delete()
+                    messages.success(request, 'Администратор удален')
 
         return redirect('manage_admins')
 
@@ -149,119 +322,125 @@ def manage_row_permissions(request, table_pk, row_pk):
 
     if request.method == 'POST':
         if 'update_submit' in request.POST:
-            # Обработка существующих пользователей
-            for perm in row.permissions.all():
-                user_id = str(perm.user.id)
-                perm.can_edit = f'can_edit_{user_id}' in request.POST
-                perm.can_delete = f'can_delete_{user_id}' in request.POST
-                perm.save()
+            with transaction.atomic():
+                # Обработка существующих пользователей
+                for perm in row.permissions.all():
+                    user_id = str(perm.user.id)
+                    perm.can_edit = f'can_edit_{user_id}' in request.POST
+                    perm.can_delete = f'can_delete_{user_id}' in request.POST
+                    perm.save()
 
         # Обработка новых пользователей
         if 'add_users_submit' in request.POST:
-            new_users = request.POST.getlist('new_users')
-            if new_users:
-                can_edit = 'new_can_edit' in request.POST
-                can_delete = 'new_can_delete' in request.POST
-                for user_id in new_users:
-                    user = get_object_or_404(User, pk=user_id)
-                    RowPermission.objects.update_or_create(
-                        row=row,
-                        user=user,
-                        defaults={
-                            'can_edit': can_edit,
-                            'can_delete': can_delete,
-                        }
-                    )
-
-        if 'update_submit_fil' in request.POST:
-            # Обработка существующих филиалов
-            for f_perm in row.filial_permissions.all():
-                filial_id = str(f_perm.filial.id)
-                f_perm.can_edit = f'filial_can_edit_{filial_id}' in request.POST
-                f_perm.can_delete = f'filial_can_delete_{filial_id}' in request.POST
-
-                users_from_filial = User.objects.filter(
-                    profile__employee__id_filial=filial_id
-                )
-
-                for user in users_from_filial:
-                    # Обработка добавления пользователей для филиалов
-                    RowPermission.objects.update_or_create(
-                        row=row,
-                        user=user,
-                        defaults={
-                            'can_edit': f_perm.can_edit,
-                            'can_delete': f_perm.can_delete,
-                        }
-                    )
-
-                f_perm.save()
-
-        if 'add_filials_submit' in request.POST:
-            new_filials = request.POST.getlist('new_filials')
-            if new_filials:
-                filial_can_edit = 'new_filial_can_edit' in request.POST
-                filial_can_delete = 'new_filial_can_delete' in request.POST
-                for filial_id in new_filials:
-                    filial = get_object_or_404(Filial, pk=filial_id)
-                    RowFilialPermission.objects.update_or_create(
-                        row=row,
-                        filial=filial,
-                        defaults={
-                            'can_edit': filial_can_edit,
-                            'can_delete': filial_can_delete,
-                        }
-                    )
-                    # Применяем права ко всем пользователям филиала
-                    users = User.objects.filter(
-                        profile__employee__id_filial=filial.id
-                    ).exclude(
-                        pk__in=row.permissions.values_list('user__id', flat=True)
-                    )
-
-                    for user in users:
+            with transaction.atomic():
+                new_users = request.POST.getlist('new_users')
+                if new_users:
+                    can_edit = 'new_can_edit' in request.POST
+                    can_delete = 'new_can_delete' in request.POST
+                    for user_id in new_users:
+                        user = get_object_or_404(User, pk=user_id)
                         RowPermission.objects.update_or_create(
                             row=row,
                             user=user,
+                            defaults={
+                                'can_edit': can_edit,
+                                'can_delete': can_delete,
+                            }
+                        )
+
+        if 'update_submit_fil' in request.POST:
+            with transaction.atomic():
+                # Обработка существующих филиалов
+                for f_perm in row.filial_permissions.all():
+                    filial_id = str(f_perm.filial.id)
+                    f_perm.can_edit = f'filial_can_edit_{filial_id}' in request.POST
+                    f_perm.can_delete = f'filial_can_delete_{filial_id}' in request.POST
+
+                    users_from_filial = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+
+                    for user in users_from_filial:
+                        # Обработка добавления пользователей для филиалов
+                        RowPermission.objects.update_or_create(
+                            row=row,
+                            user=user,
+                            defaults={
+                                'can_edit': f_perm.can_edit,
+                                'can_delete': f_perm.can_delete,
+                            }
+                        )
+
+                    f_perm.save()
+
+        if 'add_filials_submit' in request.POST:
+            with transaction.atomic():
+                new_filials = request.POST.getlist('new_filials')
+                if new_filials:
+                    filial_can_edit = 'new_filial_can_edit' in request.POST
+                    filial_can_delete = 'new_filial_can_delete' in request.POST
+                    for filial_id in new_filials:
+                        filial = get_object_or_404(Filial, pk=filial_id)
+                        RowFilialPermission.objects.update_or_create(
+                            row=row,
+                            filial=filial,
                             defaults={
                                 'can_edit': filial_can_edit,
                                 'can_delete': filial_can_delete,
                             }
                         )
+                        # Применяем права ко всем пользователям филиала
+                        users = User.objects.filter(
+                            profile__employee__id_filial=filial.id
+                        ).exclude(
+                            pk__in=row.permissions.values_list('user__id', flat=True)
+                        )
+
+                        for user in users:
+                            RowPermission.objects.update_or_create(
+                                row=row,
+                                user=user,
+                                defaults={
+                                    'can_edit': filial_can_edit,
+                                    'can_delete': filial_can_delete,
+                                }
+                            )
 
         if 'remove_user' in request.POST:
-            user_id = request.POST.get('user_id')
-            if user_id:
-                user = get_object_or_404(User, pk=user_id)
-                RowPermission.objects.filter(
-                    row=row,
-                    user=user,
-                ).delete()
-
-                messages.success(request, 'Пользователь удален')
-
-        if 'remove_filial' in request.POST:
-            filial_id = request.POST.get('filial_id')
-            if filial_id:
-                filial = get_object_or_404(Filial, pk=filial_id)
-
-                RowFilialPermission.objects.filter(
-                    row=row,
-                    filial=filial,
-                ).delete()
-
-                # Применяем права ко всем пользователям филиала
-                users = User.objects.filter(
-                    profile__employee__id_filial=filial_id
-                )
-
-                for user in users:
+            with transaction.atomic():
+                user_id = request.POST.get('user_id')
+                if user_id:
+                    user = get_object_or_404(User, pk=user_id)
                     RowPermission.objects.filter(
                         row=row,
                         user=user,
                     ).delete()
 
-                messages.success(request, 'Пользователь удален')
+                    messages.success(request, 'Пользователь удален')
+
+        if 'remove_filial' in request.POST:
+            with transaction.atomic():
+                filial_id = request.POST.get('filial_id')
+                if filial_id:
+                    filial = get_object_or_404(Filial, pk=filial_id)
+
+                    RowFilialPermission.objects.filter(
+                        row=row,
+                        filial=filial,
+                    ).delete()
+
+                    # Применяем права ко всем пользователям филиала
+                    users = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+
+                    for user in users:
+                        RowPermission.objects.filter(
+                            row=row,
+                            user=user,
+                        ).delete()
+
+                    messages.success(request, 'Пользователь удален')
 
         messages.success(request, 'Обновление прав успешно!')
         return redirect('manage_row_permissions', table_pk=table.pk, row_pk=row.pk)
@@ -292,111 +471,117 @@ def manage_table_permissions(request, table_pk):
 
     if request.method == 'POST':
         if 'update_submit' in request.POST:
-            # Обработка существующих пользователей
-            for perm in table.permissions.all():
-                user_id = str(perm.user.id)
-                perm.can_view = f'can_view_{user_id}' in request.POST
-                perm.save()
+            with transaction.atomic():
+                # Обработка существующих пользователей
+                for perm in table.permissions.all():
+                    user_id = str(perm.user.id)
+                    perm.can_view = f'can_view_{user_id}' in request.POST
+                    perm.save()
 
         # Обработка новых пользователей
         if 'add_users_submit' in request.POST:
-            new_users = request.POST.getlist('new_users')
-            if new_users:
-                can_view = 'new_can_view' in request.POST
-                for user_id in new_users:
-                    user = get_object_or_404(User, pk=user_id)
-                    TablePermission.objects.update_or_create(
-                        table=table,
-                        user=user,
-                        defaults={
-                            'can_view': can_view,
-                        }
-                    )
-
-        if 'update_submit_fil' in request.POST:
-            # Обработка существующих филиалов
-            for f_perm in table.filial_permissions.all():
-                filial_id = str(f_perm.filial.id)
-                f_perm.can_view = f'filial_can_view_{filial_id}' in request.POST
-
-                users_from_filial = User.objects.filter(
-                    profile__employee__id_filial=filial_id
-                )
-
-                for user in users_from_filial:
-                    # Обработка добавления пользователей для филиалов
-                    TablePermission.objects.update_or_create(
-                        table=table,
-                        user=user,
-                        defaults={
-                            'can_view': f_perm.can_view,
-                        }
-                    )
-
-                f_perm.save()
-
-        if 'add_filials_submit' in request.POST:
-            new_filials = request.POST.getlist('new_filials')
-            if new_filials:
-                filial_can_view = 'new_filial_can_view' in request.POST
-                for filial_id in new_filials:
-                    filial = get_object_or_404(Filial, pk=filial_id)
-                    TableFilialPermission.objects.update_or_create(
-                        table=table,
-                        filial=filial,
-                        defaults={
-                            'can_view': filial_can_view,
-                        }
-                    )
-                    # Применяем права ко всем пользователям филиала
-                    users = User.objects.filter(
-                        profile__employee__id_filial=filial.id
-                    ).exclude(
-                        pk__in=table.permissions.values_list('user__id', flat=True)
-                    )
-
-                    for user in users:
+            with transaction.atomic():
+                new_users = request.POST.getlist('new_users')
+                if new_users:
+                    can_view = 'new_can_view' in request.POST
+                    for user_id in new_users:
+                        user = get_object_or_404(User, pk=user_id)
                         TablePermission.objects.update_or_create(
                             table=table,
                             user=user,
                             defaults={
-                                'can_view': filial_can_view,
+                                'can_view': can_view,
                             }
                         )
 
+        if 'update_submit_fil' in request.POST:
+            with transaction.atomic():
+                # Обработка существующих филиалов
+                for f_perm in table.filial_permissions.all():
+                    filial_id = str(f_perm.filial.id)
+                    f_perm.can_view = f'filial_can_view_{filial_id}' in request.POST
+
+                    users_from_filial = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+
+                    for user in users_from_filial:
+                        # Обработка добавления пользователей для филиалов
+                        TablePermission.objects.update_or_create(
+                            table=table,
+                            user=user,
+                            defaults={
+                                'can_view': f_perm.can_view,
+                            }
+                        )
+
+                    f_perm.save()
+
+        if 'add_filials_submit' in request.POST:
+            with transaction.atomic():
+                new_filials = request.POST.getlist('new_filials')
+                if new_filials:
+                    filial_can_view = 'new_filial_can_view' in request.POST
+                    for filial_id in new_filials:
+                        filial = get_object_or_404(Filial, pk=filial_id)
+                        TableFilialPermission.objects.update_or_create(
+                            table=table,
+                            filial=filial,
+                            defaults={
+                                'can_view': filial_can_view,
+                            }
+                        )
+                        # Применяем права ко всем пользователям филиала
+                        users = User.objects.filter(
+                            profile__employee__id_filial=filial.id
+                        ).exclude(
+                            pk__in=table.permissions.values_list('user__id', flat=True)
+                        )
+
+                        for user in users:
+                            TablePermission.objects.update_or_create(
+                                table=table,
+                                user=user,
+                                defaults={
+                                    'can_view': filial_can_view,
+                                }
+                            )
+
         if 'remove_user' in request.POST:
-            user_id = request.POST.get('user_id')
-            if user_id:
-                user = get_object_or_404(User, pk=user_id)
-                TablePermission.objects.filter(
-                    table=table,
-                    user=user,
-                ).delete()
-
-                messages.success(request, 'Пользователь удален')
-
-        if 'remove_filial' in request.POST:
-            filial_id = request.POST.get('filial_id')
-            if filial_id:
-                filial = get_object_or_404(Filial, pk=filial_id)
-
-                TableFilialPermission.objects.filter(
-                    table=table,
-                    filial=filial,
-                ).delete()
-
-                # Применяем права ко всем пользователям филиала
-                users = User.objects.filter(
-                    profile__employee__id_filial=filial_id
-                )
-
-                for user in users:
+            with transaction.atomic():
+                user_id = request.POST.get('user_id')
+                if user_id:
+                    user = get_object_or_404(User, pk=user_id)
                     TablePermission.objects.filter(
                         table=table,
                         user=user,
                     ).delete()
 
-                messages.success(request, 'Пользователь удален')
+                    messages.success(request, 'Пользователь удален')
+
+        if 'remove_filial' in request.POST:
+            with transaction.atomic():
+                filial_id = request.POST.get('filial_id')
+                if filial_id:
+                    filial = get_object_or_404(Filial, pk=filial_id)
+
+                    TableFilialPermission.objects.filter(
+                        table=table,
+                        filial=filial,
+                    ).delete()
+
+                    # Применяем права ко всем пользователям филиала
+                    users = User.objects.filter(
+                        profile__employee__id_filial=filial_id
+                    )
+
+                    for user in users:
+                        TablePermission.objects.filter(
+                            table=table,
+                            user=user,
+                        ).delete()
+
+                    messages.success(request, 'Пользователь удален')
 
         messages.success(request, 'Обновление прав успешно!')
         return redirect('manage_table_permissions', table_pk=table.pk)
@@ -523,13 +708,15 @@ def edit_row(request, table_pk, row_pk):
     if not row.has_edit_permission(request.user):
         return JsonResponse({'status': 'error', 'message': 'Нет прав на редактирование'}, status=403)
 
+    columns = Column.get_editable_columns(request.user, table)
+
     if request.method == 'POST':
-        form = RowEditForm(request.POST, row=row)
+        form = RowEditForm(request.POST, row=row, columns=columns)
         if form.is_valid():
             # Снимаем блокировку после успешного редактирования
             unlock_row(row, request.user)
 
-            save_row_data(table, row, form)
+            save_row_data(row, form, columns)
             messages.success(request, 'Строка успешно отредактирована!')
             return JsonResponse({'status': 'success'})
         return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
@@ -542,7 +729,7 @@ def edit_row(request, table_pk, row_pk):
         }, status=423)  # 423 - Locked
 
     # GET запрос - возвращаем форму
-    form = RowEditForm(row=row)
+    form = RowEditForm(row=row, columns=columns)
     html = render_to_string('tables/row_edit_form/row_edit_form.html', {
         'form': form,
         'table': table,
@@ -558,8 +745,10 @@ def add_row(request, pk):
     if not table.has_view_permission(request.user) or not table.has_add_permission:
         return HttpResponseForbidden("Вы не можете добавлять строки в эту таблицу")
 
+    columns = Column.get_editable_columns(request.user, table)
+
     if request.method == 'POST':
-        form = AddRowForm(request.POST, table=table)
+        form = AddRowForm(request.POST, table=table, columns=columns)
         if form.is_valid():
 
             # Создаем новую строку
@@ -618,7 +807,7 @@ def add_row(request, pk):
                     )
 
             # Заполняем ячейки данными из формы
-            for column in table.columns.all():
+            for column in columns:
                 field_name = f'col_{column.id}'
                 value = form.cleaned_data.get(field_name)
 
@@ -633,7 +822,7 @@ def add_row(request, pk):
         return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
 
     # GET запрос - возвращаем форму
-    form = AddRowForm(table=table)
+    form = AddRowForm(table=table, columns=columns)
     html = render_to_string('tables/add_row/add_row.html', {
         'form': form,
         'table': table  # Передаем сам объект таблицы
@@ -677,19 +866,6 @@ def shared_tables_list(request):
         'tables': tables_with_access
     })
 
-#НУЖНО ПОЛНОСТЬЮ ПЕРЕДЕЛАТЬ
-@login_required
-@require_POST
-def revoke_access(request, pk):
-    table = get_object_or_404(Table, pk=pk)
-    if not (table.owner == request.user or table.is_admin(request.user)):
-        return HttpResponseForbidden("Только владелец таблицы может отозвать доступ")
-
-    user = get_object_or_404(User, pk=request.POST.get('user_id'))
-    table.remove_user_access(user)
-    messages.success(request, f"Доступ для {user.email} отозван!")
-    return redirect('share_table', pk=table.pk)
-
 
 @login_required
 def table_detail(request, pk):
@@ -699,13 +875,14 @@ def table_detail(request, pk):
         return HttpResponseForbidden("You don't have permission to access this table.")
 
     queryset = table_obj.rows.all().prefetch_related('cells', 'cells__column')
+    columns = table_obj.columns.all()
 
-    queryset, search_query = filter_func(queryset, request, table_obj)
+    queryset, search_query = filter_func(queryset, columns, request)
 
     # Добавляем аннотации для каждого столбца
-    queryset = sort_func(queryset, table_obj)
+    queryset = sort_func(queryset, columns)
 
-    table = DynamicTable(data=queryset, table_obj=table_obj, request=request)
+    table = DynamicTable(data=queryset, table_obj=table_obj, columns=columns, request=request)
     RequestConfig(request).configure(table)
     return render(request, 'tables/table_detail.html', {
         'table_obj': table_obj,
@@ -724,11 +901,12 @@ def shared_table_view(request, share_token):
 
     # Получаем строки, которые пользователь может видеть
     rows = Row.get_visible_rows(request.user, table)
+    columns = Column.get_visible_columns(request.user, table)
 
-    rows, search_query = filter_func(rows, request, table)
+    rows, search_query = filter_func(rows, columns, request)
 
-    queryset = sort_func(rows, table)
-    table_view = DynamicTable(data=queryset, table_obj=table, request=request)
+    queryset = sort_func(rows, columns)
+    table_view = DynamicTable(data=queryset, table_obj=table, columns=columns, request=request)
     RequestConfig(request).configure(table_view)
 
     return render(request, 'tables/shared_table.html', {
@@ -810,12 +988,12 @@ def export_table(request, table_pk):
     })
 
 
-def filter_func(queryset, request, table_obj):
+def filter_func(queryset, columns, request):
     search_query = request.GET.get('q', '')
     if search_query:
         # Создаем условие для поиска по всем колонкам
         column_conditions = Q()
-        for column in table_obj.columns.all():
+        for column in columns:
             column_conditions |= Q(cells__column=column, cells__text_value__icontains=search_query)
             if column.data_type == Column.ColumnType.INTEGER:
                 try:
@@ -877,7 +1055,7 @@ def filter_func(queryset, request, table_obj):
         return queryset, search_query
 
 
-def sort_func(queryset, table_obj):
+def sort_func(queryset, columns):
     queryset = queryset.annotate(
         user_full_name=Concat(
             F('created_by__profile__employee__secondname'),
@@ -898,6 +1076,6 @@ def sort_func(queryset, table_obj):
         )
     )
 
-    for column in table_obj.columns.all():
+    for column in columns:
         queryset = Row.annotate_for_sorting(queryset, column.id, column.data_type)
     return queryset

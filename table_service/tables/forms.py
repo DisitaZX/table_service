@@ -1,7 +1,8 @@
 from django import forms
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
-from .models import Table, Column, Cell
+from .models import Table, Column, Cell, ColumnPermission, Filial, Employee, ColumnFilialPermission
 
 
 class TableForm(forms.ModelForm):
@@ -26,29 +27,71 @@ class ColumnForm(forms.ModelForm):
     }
 
 
-class ShareTableForm(forms.Form):
-    email = forms.EmailField(label="User Email")
-    can_edit = forms.BooleanField(
-        label="Can Edit",
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+class ColumnPermissionForm(forms.ModelForm):
+    class Meta:
+        model = ColumnPermission
+        fields = ['permission_type']
+        widgets = {
+            'permission_type': forms.Select(attrs={
+                'class': 'form-select'
+            })
+        }
+
+
+class ColumnFilialPermissionForm(forms.ModelForm):
+    class Meta:
+        model = ColumnFilialPermission
+        fields = ['permission_type']
+        widgets = {
+            'permission_type': forms.Select(attrs={
+                'class': 'form-select'
+            })
+        }
+
+
+class ColumnPermissionUserForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'userSelect'
+        })
     )
-    can_delete = forms.BooleanField(
-        label="Can Delete",
-        required=False,
-        initial=False,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+
+    def __init__(self, *args, **kwargs):
+        table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+        if table:
+            self.fields['user'].queryset = User.objects.all().select_related('profile__employee').order_by(
+                'profile__employee__lastname',
+                'profile__employee__firstname',
+                'profile__employee__secondname'
+            )
+
+
+class ColumnPermissionFilialForm(forms.Form):
+    filial = forms.ModelChoiceField(
+        queryset=Filial.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'filialSelect'
+        })
     )
+
+    def __init__(self, *args, **kwargs):
+        table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+        if table:
+            self.fields['filial'].queryset = Filial.objects.all()
 
 
 class AddRowForm(forms.Form):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, columns, **kwargs):
         self.table = kwargs.pop('table', None)
         super().__init__(*args, **kwargs)
 
         if self.table:
-            for column in self.table.columns.all():
+            for column in columns:
                 field_name = f'col_{column.id}'
                 initial_value = Cell.get_default_value(column.data_type)
 
@@ -111,12 +154,12 @@ class AddRowForm(forms.Form):
 
 
 class RowEditForm(forms.Form):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, columns, **kwargs):
         self.row = kwargs.pop('row', None)
         super().__init__(*args, **kwargs)
 
         if self.row:
-            for column in self.row.table.columns.all():
+            for column in columns:
                 cell = self.row.cells.filter(column=column).first()
                 if cell:
                     initial_value = cell.value

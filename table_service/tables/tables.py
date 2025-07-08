@@ -102,12 +102,12 @@ class DynamicTable(tables.Table):
         }
         fields = ()  # Будем заполнять динамически
 
-    def __init__(self, *args, table_obj=None, request=None, **kwargs):
+    def __init__(self, *args, table_obj=None, columns=None, request=None, **kwargs):
         self.base_columns.clear()
         self.table_obj = table_obj
         self.request = request
         if table_obj:
-            for column in table_obj.columns.all():
+            for column in columns:
                 self._add_column(column)
 
             self.base_columns['filial'] = tables.Column(
@@ -219,34 +219,47 @@ class DynamicTable(tables.Table):
         edit = format_html('')
         if column and self.table_obj.owner == self.request.user:
             delete_url = reverse('delete_column',
-                                 kwargs={'table_pk': self.table_obj.pk,
-                                         'column_pk': column.id
-                                         })
+                                 kwargs={
+                                     'table_pk': self.table_obj.pk,
+                                     'column_pk': column.id
+                                 })
+            manage_column = reverse('manage_column_permissions',
+                                    kwargs={
+                                        'table_pk': self.table_obj.pk,
+                                        'column_pk': column.id
+                                    })
             edit += format_html(
-                '<div class="d-flex justify-content-between align-items-center">'
+                '<div class="d-flex align-items-center">'
                 '<div>{}</div>'
-                '<div>'
-                '<form method="post" action="{}" style="display:inline;">{}'
+                '<div class="d-flex mr-auto p-2">'
+                '<form method="post" action="{}">{}'
                 '<button type="submit" '
-                'class="btn btn-sm btn-danger ms-3" '
+                'class="btn btn-sm btn-outline-primary">'
+                '<i class="bi bi-people-fill"></i></button>'
+                '</form>'
+                '<form method="post" action="{}"">{}'
+                '<button type="submit" '
+                'class="btn btn-sm btn-danger" '
                 'onclick="return confirm(\'Удалить столбец?\');">'
                 '<i class="bi bi-x-lg"></i></button>'
                 '</form>'
                 '</div>'
                 '</div>',
                 column.name,
+                manage_column,
+                csrf_input(self.request),
                 delete_url,
                 csrf_input(self.request)
             )
         elif column:
-            edit += format_html('<div>{}</div>', column.name)
+            edit += format_html('<div class="d-flex mr-auto p-2">{}</div>', column.name)
         elif is_user:
-            edit += format_html('<div>Пользователь</div>')
+            edit += format_html('<div class="d-flex mr-auto p-2">Пользователь</div>')
         elif is_filial:
-            edit += format_html('<div>Филиал</div>')
+            edit += format_html('<div class="d-flex mr-auto p-2">Филиал</div>')
 
         sort_icon = self.render_sort_icon(column, is_user=is_user, is_filial=is_filial)
-        return format_html('{} {}', sort_icon, edit)
+        return format_html('<div class="d-flex align-items-center">{} {}</div>', sort_icon, edit)
 
     def _get_sort_params(self, column=None, is_user=False, is_filial=False):
         if column:  # Для обычных колонок таблицы
@@ -295,21 +308,21 @@ class DynamicTable(tables.Table):
                 if 'sort' in params:
                     del params['sort']
                 return format_html(
-                    '<a href="?{}" class="sort-link"><i class="{}"></i></a>',
+                    '<a href="?{}" class="sort-link btn-sm"><i class="{}"></i></a>',
                     params.urlencode(),
                     self.SORT_DOWN_ICON
                 )
             else:
                 params['sort'] = desc_sort
                 return format_html(
-                    '<a href="?{}" class="sort-link"><i class="{}"></i></a>',
+                    '<a href="?{}" class="sort-link btn-sm"><i class="{}"></i></a>',
                     params.urlencode(),
                     self.SORT_UP_ICON
                 )
         else:
             params['sort'] = asc_sort
             return format_html(
-                '<a href="?{}" class="sort-link"><i class="{}"></i></a>',
+                '<a href="?{}" class="sort-link btn-sm"><i class="{}"></i></a>',
                 params.urlencode(),
                 self.SORT_ICON
             )

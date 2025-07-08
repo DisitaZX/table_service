@@ -18,6 +18,9 @@ class Filial(models.Model):
     end_date = models.DateField(null=True, blank=True)
     boss = models.CharField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.name} (id: {self.id})"
+
 
 class Employee(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -33,6 +36,7 @@ class Employee(models.Model):
 
     def __str__(self):
         return f"{self.secondname} {self.firstname} {self.lastname}"
+
 
 class Department(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -150,8 +154,64 @@ class Column(models.Model):
     class Meta:
         ordering = ['order']
 
+    @classmethod
+    def get_visible_columns(cls, user, table):
+        """Возвращает колонки, которые пользователь может видеть"""
+        if table.owner == user:
+            return table.columns.all()
+        if table.is_admin(user):
+            return table.columns.all()
+        result = models.Q(permissions__user=user, permissions__permission_type__in=['EV', 'VO'])
+        return table.columns.filter(result).distinct()
+
+    @classmethod
+    def get_editable_columns(cls, user, table):
+        """Возвращает колонки, которые пользователь может редактировать"""
+        if table.owner == user:
+            return table.columns.all()
+        if table.is_admin(user):
+            return table.columns.all()
+        result = models.Q(permissions__user=user, permissions__permission_type='EV')
+        return table.columns.filter(result).distinct()
+
     def __str__(self):
         return f"{self.table.title} - {self.name}"
+
+
+class ColumnPermission(models.Model):
+    class PermissionType(models.TextChoices):
+        EDIT_VIEW = 'EV', 'Редактировать + Просмотр'
+        VIEW_ONLY = 'VO', 'Только просмотр'
+        NO_ACCESS = 'NA', 'Нет доступа'
+    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='permissions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    permission_type = models.CharField(
+        max_length=2,
+        choices=PermissionType.choices,
+        default=PermissionType.EDIT_VIEW,
+        verbose_name='Тип доступа'
+    )
+
+    class Meta:
+        unique_together = ('column', 'user')
+
+
+class ColumnFilialPermission(models.Model):
+    class PermissionType(models.TextChoices):
+        EDIT_VIEW = 'EV', 'Редактировать + Просмотр'
+        VIEW_ONLY = 'VO', 'Только просмотр'
+        NO_ACCESS = 'NA', 'Нет доступа'
+    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='filial_permissions')
+    filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
+    permission_type = models.CharField(
+        max_length=2,
+        choices=PermissionType.choices,
+        default=PermissionType.EDIT_VIEW,
+        verbose_name='Тип доступа'
+    )
+
+    class Meta:
+        unique_together = ('column', 'filial')
 
 
 class Row(models.Model):
