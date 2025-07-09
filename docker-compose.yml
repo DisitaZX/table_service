@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data_table_service:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    networks:
+      - my_network
+
+  app:
+    build: .
+    #image: mail-service-app:latest
+    depends_on:
+      - db
+    environment:
+      - DJANGO_SETTINGS_MODULE=table_service.settings
+    ports:
+      - "8002:8000"
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge
+
+volumes:
+  postgres_data_table_service:
