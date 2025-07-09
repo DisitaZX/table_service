@@ -26,9 +26,6 @@
         <a href="{% url 'manage_table_permissions' table_obj.pk %}" class="btn btn-outline-warning">
             <i class="fa-solid fa-pen-to-square"></i> Редактировать права на таблицу
         </a>
-        <a href="{% url 'unlock_filial_table' table_obj.pk %}" class="btn btn-outline-primary">
-            Редактировать блокировку филиалов на добавление строк
-        </a>
         <a href="{% url 'export_table' table_obj.pk %}" class="btn btn-outline-primary">
             Экспорт таблицы
         </a>

@@ -88,16 +88,25 @@ class Table(models.Model):
 
     def has_add_permission(self, user):
         """Проверяет, может ли пользователь добавлять строки в таблицу"""
-        # Проверяем глобальную блокировку для филиала
-        filial = Filial.objects.get(id=user.profile.employee.id_filial)
-        if TableFilialLock.objects.filter(
-                table=self,
-                filial=filial,
-                locked_by=user
-        ).exists():
+        if self.owner == user:
+            return True
+        if self.is_admin(user):
+            return True
+        if self.permissions.filter(user=user, permission_type='NNN'):
             return False
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+        query = UserFilial.objects.filter(user=user, table=self)
 
-        return True
+        for q in query:
+            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN']):
+                return True
+
+        if self.permissions.filter(user=user, permission_type__in=['RWD', 'RWN']):
+            return True
+
+        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN']):
+            return True
+        return False
 
     def has_view_permission(self, user):
         """Проверяет, может ли пользователь видеть таблицу"""
@@ -105,7 +114,21 @@ class Table(models.Model):
             return True
         if self.is_admin(user):
             return True
-        return self.permissions.filter(user=user, can_view=True).exists()
+        if self.permissions.filter(user=user, permission_type='NNN'):
+            return False
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+        query = UserFilial.objects.filter(user=user, table=self)
+
+        for q in query:
+            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
+                return True
+
+        if self.permissions.filter(user=user, permission_type__in=['RWD', 'RWN', 'RNN']):
+            return True
+
+        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN', 'RNN']):
+            return True
+        return False
 
     @classmethod
     def get_shared_tables(cls, user):
@@ -114,6 +137,22 @@ class Table(models.Model):
         shared_via_permissions = cls.objects.filter(
             permissions__user=user,
         ).distinct()
+
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+
+        # Таблицы, где главный филиал пользователя явно указан в TableFilialPermission
+        shared_via_permissions |= cls.objects.filter(
+            filial_permissions__filial=main_filial,
+        ).distinct()
+
+        """
+        # Таблицы, где доп филиалы пользователя явно указаны в TableFilialPermission
+        query = UserFilial.objects.filter(user=user)
+        for q in query:
+            shared_via_permissions |= cls.objects.filter(
+                filial_permissions__filial=q.filial,
+            ).distinct()
+        """
         return shared_via_permissions
 
     def __str__(self):
@@ -154,64 +193,8 @@ class Column(models.Model):
     class Meta:
         ordering = ['order']
 
-    @classmethod
-    def get_visible_columns(cls, user, table):
-        """Возвращает колонки, которые пользователь может видеть"""
-        if table.owner == user:
-            return table.columns.all()
-        if table.is_admin(user):
-            return table.columns.all()
-        result = models.Q(permissions__user=user, permissions__permission_type__in=['EV', 'VO'])
-        return table.columns.filter(result).distinct()
-
-    @classmethod
-    def get_editable_columns(cls, user, table):
-        """Возвращает колонки, которые пользователь может редактировать"""
-        if table.owner == user:
-            return table.columns.all()
-        if table.is_admin(user):
-            return table.columns.all()
-        result = models.Q(permissions__user=user, permissions__permission_type='EV')
-        return table.columns.filter(result).distinct()
-
     def __str__(self):
         return f"{self.table.title} - {self.name}"
-
-
-class ColumnPermission(models.Model):
-    class PermissionType(models.TextChoices):
-        EDIT_VIEW = 'EV', 'Редактировать + Просмотр'
-        VIEW_ONLY = 'VO', 'Только просмотр'
-        NO_ACCESS = 'NA', 'Нет доступа'
-    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='permissions')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    permission_type = models.CharField(
-        max_length=2,
-        choices=PermissionType.choices,
-        default=PermissionType.EDIT_VIEW,
-        verbose_name='Тип доступа'
-    )
-
-    class Meta:
-        unique_together = ('column', 'user')
-
-
-class ColumnFilialPermission(models.Model):
-    class PermissionType(models.TextChoices):
-        EDIT_VIEW = 'EV', 'Редактировать + Просмотр'
-        VIEW_ONLY = 'VO', 'Только просмотр'
-        NO_ACCESS = 'NA', 'Нет доступа'
-    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='filial_permissions')
-    filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
-    permission_type = models.CharField(
-        max_length=2,
-        choices=PermissionType.choices,
-        default=PermissionType.EDIT_VIEW,
-        verbose_name='Тип доступа'
-    )
-
-    class Meta:
-        unique_together = ('column', 'filial')
 
 
 class Row(models.Model):
@@ -234,7 +217,23 @@ class Row(models.Model):
             return True
         if self.table.is_admin(user):
             return True
-        return self.permissions.filter(user=user, can_edit=True).exists()
+
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type='NNN'):
+            return False
+
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RWD', 'RWN']):
+            return True
+
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+
+        if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+            return True
+
+        query = UserFilial.objects.filter(user=user, table=self.table)
+        for q in query:
+            if TableFilialPermission.objects.filter(filial=q.filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+                return True
+        return False
 
     def has_delete_permission(self, user):
         """Проверяет, может ли пользователь удалять строку"""
@@ -242,26 +241,23 @@ class Row(models.Model):
             return True
         if self.table.is_admin(user):
             return True
-        return self.permissions.filter(user=user, can_delete=True).exists()
 
-    def has_manage_permission(self, user):
-        """Проверяет, может ли пользователь управлять правами на строку"""
-        if self.table.owner == user:
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type='NNN'):
+            return False
+
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type='RWD'):
             return True
-        if self.table.is_admin(user):
+
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+
+        if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type='RWD'):
             return True
+
+        query = UserFilial.objects.filter(user=user, table=self.table)
+        for q in query:
+            if TableFilialPermission.objects.filter(filial=q.filial, table=self.table, permission_type='RWD'):
+                return True
         return False
-
-    @classmethod
-    def get_visible_rows(cls, user, table):
-        """Возвращает строки, которые пользователь может видеть"""
-        if table.owner == user:
-            return table.rows.all()
-        if table.is_admin(user):
-            return table.rows.all()
-        result = models.Q(permissions__user=user)
-
-        return table.rows.filter(result).distinct()
 
     @property
     def user_values(self):
@@ -304,6 +300,33 @@ class Row(models.Model):
                 for cell in cells
             }
         return self._cell_values_cache
+
+    @classmethod
+    def get_visible_rows(cls, user, table):
+        """Возвращает строки, которые пользователь может видеть"""
+        if table.owner == user:
+            return table.rows.all()
+        if table.is_admin(user):
+            return table.rows.all()
+
+        if TablePermission.objects.filter(user=user, table=table, permission_type__in=['RWD', 'RWN', 'RNN']):
+            return table.rows.all()
+
+        result = cls.objects.none()
+
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+        if TableFilialPermission.objects.filter(filial=main_filial, table=table,
+                                                permission_type__in=['RWD', 'RWN', 'RNN']):
+            result |= cls.objects.filter(created_by__profile__employee__id_filial=main_filial.id).distinct()
+
+        query = UserFilial.objects.filter(user=user, table=table)
+
+        for q in query:
+            if TableFilialPermission.objects.filter(filial=q.filial, table=table,
+                                                    permission_type__in=['RWD', 'RWN', 'RNN']):
+                result |= cls.objects.filter(created_by__profile__employee__id_filial=q.filial.id).distinct()
+
+        return result
 
     @classmethod
     def annotate_for_sorting(cls, queryset, column_id, data_type):
@@ -422,42 +445,42 @@ class Cell(models.Model):
         return f"{self.row} - {self.column}: {self.value}"
 
 
+class UserFilial(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    table = models.ForeignKey(Table, on_delete=models.CASCADE)
+    filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
+
+
 class TablePermission(models.Model):
+    class PermissionType(models.TextChoices):
+        EDIT_VIEW_DELETE = 'RWD', 'Редактировать + Просмотр + Удалять'
+        VIEW_ONLY = 'RNN', 'Только просмотр'
+        EDIT_VIEW = 'RWN', 'Редактировать + Просмотр'
+        NO_ACCESS = 'NNN', 'Нет доступа'
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='permissions')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    can_view = models.BooleanField(default=True)
-
-    class Meta:
-        unique_together = ('table', 'user')
+    permission_type = models.CharField(
+        max_length=3,
+        choices=PermissionType.choices,
+        default=PermissionType.EDIT_VIEW_DELETE,
+        verbose_name='Тип доступа'
+    )
 
 
 class TableFilialPermission(models.Model):
+    class PermissionType(models.TextChoices):
+        EDIT_VIEW_DELETE = 'RWD', 'Редактировать + Просмотр + Удалять'
+        VIEW_ONLY = 'RNN', 'Только просмотр'
+        EDIT_VIEW = 'RWN', 'Редактировать + Просмотр'
+        NO_ACCESS = 'NNN', 'Нет доступа'
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='filial_permissions')
     filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
-    can_view = models.BooleanField(default=True)
-
-    class Meta:
-        unique_together = ('table', 'filial')
-
-
-class RowPermission(models.Model):
-    row = models.ForeignKey(Row, on_delete=models.CASCADE, related_name='permissions')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    can_edit = models.BooleanField(default=True)
-    can_delete = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('row', 'user')
-
-
-class RowFilialPermission(models.Model):
-    row = models.ForeignKey(Row, on_delete=models.CASCADE, related_name='filial_permissions')
-    filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
-    can_edit = models.BooleanField(default=True)
-    can_delete = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('row', 'filial')
+    permission_type = models.CharField(
+        max_length=3,
+        choices=PermissionType.choices,
+        default=PermissionType.EDIT_VIEW_DELETE,
+        verbose_name='Тип доступа'
+    )
 
 
 class RowLock(models.Model):

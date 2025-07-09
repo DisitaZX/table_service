@@ -159,24 +159,6 @@ class DynamicTable(tables.Table):
         column_class = column_types.get(column.data_type, tables.Column)
         self.base_columns[col_name] = column_class(**column_kwargs)
 
-    def render_delete(self, record):
-        if (self.table_obj.owner == self.request.user) or (record.has_delete_permission(self.request.user)):
-            delete_url = reverse('delete_row',
-                                 kwargs={'table_pk': self.table_obj.pk,
-                                         'row_pk': record.id
-                                         })
-            return format_html(
-                '<form method="post" action="{}" style="display:inline;">{}'
-                '<button type="submit" '
-                'class="btn btn-sm btn-danger" '
-                'onclick="return confirm(\'Удалить строку?\');">'
-                '×</button>'
-                '</form>',
-                delete_url,
-                csrf_input(self.request)
-            )
-        return ''
-
     def render_actions(self, record):
         edit = format_html('')
         if record.has_edit_permission(self.request.user):
@@ -203,16 +185,6 @@ class DynamicTable(tables.Table):
                 delete_url,
                 csrf_input(self.request)
             )
-
-        if record.has_manage_permission(self.request.user):
-            edit += format_html(
-                '<a href="{}" class="btn btn-sm btn-outline-secondary" title="Настроить разрешения">'
-                '<i class="bi bi-people-fill"></i></a>',
-                reverse('manage_row_permissions', kwargs={
-                    'table_pk': self.table_obj.pk,
-                    'row_pk': record.id
-                })
-            )
         return edit
 
     def get_column_header(self, column=None, is_user=False, is_filial=False):
@@ -223,20 +195,10 @@ class DynamicTable(tables.Table):
                                      'table_pk': self.table_obj.pk,
                                      'column_pk': column.id
                                  })
-            manage_column = reverse('manage_column_permissions',
-                                    kwargs={
-                                        'table_pk': self.table_obj.pk,
-                                        'column_pk': column.id
-                                    })
             edit += format_html(
                 '<div class="d-flex align-items-center">'
                 '<div>{}</div>'
                 '<div class="d-flex mr-auto p-2">'
-                '<form method="post" action="{}">{}'
-                '<button type="submit" '
-                'class="btn btn-sm btn-outline-primary">'
-                '<i class="bi bi-people-fill"></i></button>'
-                '</form>'
                 '<form method="post" action="{}"">{}'
                 '<button type="submit" '
                 'class="btn btn-sm btn-danger" '
@@ -246,8 +208,6 @@ class DynamicTable(tables.Table):
                 '</div>'
                 '</div>',
                 column.name,
-                manage_column,
-                csrf_input(self.request),
                 delete_url,
                 csrf_input(self.request)
             )

@@ -33,19 +33,27 @@
                     <thead>
                         <tr>
                             <th>Пользователь</th>
+                            <th>Логин</th>
                             <th>ID Филиала</th>
-                            <th>Разрешить просматривать</th>
+                            <th>Уровень доступа</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for perm in permissions %}
                         <tr class="user-row">
-                            <td class="user-name">{{ perm.user.username }}</td>
-                            <td class="user-filial">{{ perm.user.profile.employee.id_filial }}</td>
+                            <td class="user-name">{{ perm.user.profile.employee }}</td>
+                            <td>{{ perm.user }}</td>
+                            <td>{{ perm.user.profile.employee.id_filial }}</td>
                             <td>
-                                <input type="checkbox" name="can_view_{{ perm.user.id }}"
-                                       {% if perm.can_view %}checked{% endif %}>
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    {{ perm.form.permission_type }}
+                                    <button type="submit" name="update_user" value="{{ perm.user.id }}"
+                                            class="btn btn-sm btn-primary mt-2">
+                                        Обновить
+                                    </button>
+                                </form>
                             </td>
                             <td>
                                 <form method="post" style="display:inline;">
@@ -74,24 +82,19 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="row">
+                    <div class="col-md-6">
+                        {{ user_form.user }}
+                    </div>
                     <div class="col-md-4">
-                        <input type="text" id="userFilter" class="form-control mb-2" placeholder="Фильтр пользователей...">
-                        <select name="new_users" multiple class="form-select" id="userSelect" size="5">
-                            {% for user in all_users %}
-                                <option value="{{ user.id }}" data-filial="{{ user.profile.employee.id_filial }}">
-                                    {{ user.username }} (Филиал: {{ user.profile.employee.id_filial }})
-                                </option>
-                            {% endfor %}
+                        <select name="permission_type" class="form-select">
+                            <option value="RWD">Редактировать + Просмотр + Удалять</option>
+                            <option value="RWN">Редактировать + Просмотр</option>
+                            <option value="RNN">Только просмотр</option>
+                            <option value="NNN">Нет доступа</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <div class="form-check mt-4">
-                            <input type="checkbox" name="new_can_view" id="new_can_view" checked>
-                            <label for="new_can_view">Разрешить просматривать</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" name="add_users_submit" class="btn btn-primary mt-4">Добавить</button>
+                    <div class="col-md-2">
+                        <button type="submit" name="add_user" class="btn btn-primary">Добавить</button>
                     </div>
                 </div>
             </form>
@@ -116,23 +119,29 @@
                         <tr>
                             <th>Филиал</th>
                             <th>ID Филиала</th>
-                            <th>Разрешить просматривать</th>
+                            <th>Уровень доступа</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for fil_perm in filial_permissions %}
+                        {% for perm in filial_permissions %}
                         <tr class="filial-row">
-                            <td class="filial-name">{{ fil_perm.filial.name }}</td>
-                            <td class="filial-id">{{ fil_perm.filial.id }}</td>
+                            <td class="filial-name">{{ perm.filial.name }}</td>
+                            <td>{{ perm.filial.id }}</td>
                             <td>
-                                <input type="checkbox" name="filial_can_view_{{ fil_perm.filial.id }}"
-                                       {% if fil_perm.can_view %}checked{% endif %}>
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    {{ perm.form.permission_type }}
+                                    <button type="submit" name="update_filial" value="{{ perm.filial.id }}"
+                                            class="btn btn-sm btn-primary mt-2">
+                                        Обновить
+                                    </button>
+                                </form>
                             </td>
                             <td>
                                 <form method="post" style="display:inline;">
                                     {% csrf_token %}
-                                    <input type="hidden" name="filial_id" value="{{ fil_perm.filial.id }}">
+                                    <input type="hidden" name="filial_id" value="{{ perm.filial.id }}">
                                     <button type="submit" name="remove_filial" class="btn btn-sm btn-danger"
                                             onclick="return confirm('Удалить филиал?')">
                                         Удалить
@@ -143,7 +152,6 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                <button type="submit" name="update_submit_fil" class="btn btn-primary">Сохранить все изменения</button>
             </form>
         </div>
     </div>
@@ -156,24 +164,19 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="row">
+                    <div class="col-md-6">
+                        {{ filial_form.filial }}
+                    </div>
                     <div class="col-md-4">
-                        <input type="text" id="filialFilter" class="form-control mb-2" placeholder="Фильтр филиалов...">
-                        <select name="new_filials" multiple class="form-select" id="filialSelect" size="5">
-                            {% for filial in all_filials %}
-                                <option value="{{ filial.id }}">
-                                    {{ filial.name }} (ID: {{ filial.id }})
-                                </option>
-                            {% endfor %}
+                        <select name="permission_type" class="form-select">
+                            <option value="RWD">Редактировать + Просмотр + Удалять</option>
+                            <option value="RWN">Редактировать + Просмотр</option>
+                            <option value="RNN">Только просмотр</option>
+                            <option value="NNN">Нет доступа</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <div class="form-check mt-4">
-                            <input type="checkbox" name="new_filial_can_view" id="new_filial_can_view" checked>
-                            <label for="new_filial_can_view">Разрешить просматривать</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" name="add_filials_submit" class="btn btn-primary mt-4">Добавить</button>
+                    <div class="col-md-2">
+                        <button type="submit" name="add_filial" class="btn btn-primary">Добавить</button>
                     </div>
                 </div>
             </form>

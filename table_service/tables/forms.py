@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
-from .models import Table, Column, Cell, ColumnPermission, Filial, Employee, ColumnFilialPermission
+from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission
 
 
 class TableForm(forms.ModelForm):
@@ -27,9 +27,9 @@ class ColumnForm(forms.ModelForm):
     }
 
 
-class ColumnPermissionForm(forms.ModelForm):
+class TablePermissionForm(forms.ModelForm):
     class Meta:
-        model = ColumnPermission
+        model = TablePermission
         fields = ['permission_type']
         widgets = {
             'permission_type': forms.Select(attrs={
@@ -38,9 +38,9 @@ class ColumnPermissionForm(forms.ModelForm):
         }
 
 
-class ColumnFilialPermissionForm(forms.ModelForm):
+class TableFilialPermissionForm(forms.ModelForm):
     class Meta:
-        model = ColumnFilialPermission
+        model = TableFilialPermission
         fields = ['permission_type']
         widgets = {
             'permission_type': forms.Select(attrs={
@@ -49,7 +49,7 @@ class ColumnFilialPermissionForm(forms.ModelForm):
         }
 
 
-class ColumnPermissionUserForm(forms.Form):
+class PermissionUserForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=User.objects.none(),
         widget=forms.Select(attrs={
@@ -69,7 +69,7 @@ class ColumnPermissionUserForm(forms.Form):
             )
 
 
-class ColumnPermissionFilialForm(forms.Form):
+class PermissionFilialForm(forms.Form):
     filial = forms.ModelChoiceField(
         queryset=Filial.objects.none(),
         widget=forms.Select(attrs={
