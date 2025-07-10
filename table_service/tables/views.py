@@ -19,6 +19,45 @@ from .tables import DynamicTable, ExportTable
 from django.views.decorators.http import require_POST
 
 
+def get_user_filials(request):
+    """AJAX view для получения филиалов пользователя"""
+    user_id = request.GET.get('user_id')
+    table_id = request.GET.get('table_id')
+
+    if not user_id or not table_id:
+        return JsonResponse({'filials': []})
+
+    try:
+        user = User.objects.get(id=user_id)
+        table = Table.objects.get(id=table_id)
+
+        # Основной филиал пользователя
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+
+        # Дополнительные филиалы пользователя для этой таблицы
+        additional_filials = UserFilial.objects.filter(
+            user=user,
+            table=table
+        ).select_related('filial')
+
+        # Собираем все филиалы
+        filials = [{
+            'id': main_filial.id,
+            'name': main_filial.name
+        }]
+
+        for user_filial in additional_filials:
+            filials.append({
+                'id': user_filial.filial.id,
+                'name': user_filial.filial.name
+            })
+
+        return JsonResponse({'filials': filials})
+
+    except (User.DoesNotExist, Table.DoesNotExist, Employee.DoesNotExist, Filial.DoesNotExist):
+        return JsonResponse({'filials': []})
+
+
 def save_row_data(row, form, columns):
     """Сохраняет данные строки из формы"""
     for column in columns:
@@ -50,23 +89,6 @@ def create_table(request):
             table.owner = request.user
             table.created_at = datetime.datetime.now()
             table.save()
-
-            #  Добавление овнеру всех прав на таблицу
-            TablePermission.objects.update_or_create(
-                table=table,
-                user=request.user,
-                permission_type='RWD'
-            )
-
-            administration = Admin.objects.exclude(user_id=request.user.id)
-
-            # Создаем права для всех админов
-            for admin in administration:
-                TablePermission.objects.update_or_create(
-                    table=table,
-                    user=admin.user,
-                    permission_type='RWD'
-                )
 
             return redirect('table_detail', pk=table.pk)
     else:
@@ -277,28 +299,32 @@ def manage_table_permissions(request, table_pk):
     if request.method == 'POST':
         with transaction.atomic():
             if 'update_user' in request.POST:
-                user_id = request.POST.get('update_user')
-                perm = table.permissions.get(table=table, user_id=user_id)
+                user_id, filial_id = request.POST.get('update_user').split('|')
+                perm = table.permissions.get(table=table, user_id=user_id, filial_id=filial_id)
                 field_name = f'user_{perm.user.id}-permission_type'
                 if field_name in request.POST:
                     perm.permission_type = request.POST[field_name]
                     perm.save()
                 messages.success(request, 'Права пользователей обновлены')
-
+###ГДЕ-ТО ТУТ НАДО СДЕЛАТЬ ТАК ЧТОБЫ В table.permissions БЫЛО НЕСКОЛЬКО ФИЛИАЛОВ ДЛЯ ОДНОГО ЮЗЕРА
             elif 'remove_user' in request.POST:
-                user_id = request.POST.get('user_id')
+                user_id, filial_id = request.POST.get('user_id').split('|')
                 if user_id:
-                    table.permissions.filter(table=table, user_id=user_id).delete()
+                    table.permissions.filter(table=table, user_id=user_id, filial_id=filial_id).delete()
                     messages.success(request, 'Права пользователя удалены')
 
             elif 'add_user' in request.POST:
                 user_id = request.POST.get('user')
+                filial_id = request.POST.get('filial')
                 permission_type = request.POST.get('permission_type')
                 if user_id and permission_type:
                     TablePermission.objects.update_or_create(
                         table=table,
                         user_id=user_id,
-                        defaults={'permission_type': permission_type}
+                        filial_id=filial_id,
+                        defaults={
+                            'permission_type': permission_type
+                        }
                     )
                     messages.success(request, 'Права пользователя добавлены')
 
@@ -336,7 +362,8 @@ def manage_table_permissions(request, table_pk):
     permissions = []
     for perm in table.permissions.all():
         perm.form = TablePermissionForm(initial={
-            'permission_type': perm.permission_type
+            'permission_type': perm.permission_type,
+            'filial': perm.filial,
         }, prefix=f'user_{perm.user.id}')
         permissions.append(perm)
 
@@ -368,6 +395,13 @@ def revoke_redact_rows(request, share_token, id_filial):
         filial = Filial.objects.get(id=id_filial)
         with transaction.atomic():
             TableFilialPermission.objects.update_or_create(
+                table=table,
+                filial=filial,
+                defaults={
+                    'permission_type': 'RNN'
+                }
+            )
+            TablePermission.objects.update_or_create(
                 table=table,
                 filial=filial,
                 defaults={
@@ -467,7 +501,7 @@ def edit_row(request, table_pk, row_pk):
 def add_row(request, pk):
     table = get_object_or_404(Table, pk=pk)
 
-    if not table.has_view_permission(request.user) or not table.has_add_permission(request.user):
+    if not table.has_add_permission(request.user):
         return HttpResponseForbidden("Вы не можете добавлять строки в эту таблицу")
 
     columns = table.columns.all()
@@ -603,7 +637,7 @@ def shared_table_view(request, share_token):
         'filials': filials,
         'is_owner': table.owner == request.user,
         'is_admin': table.is_admin(request.user),
-        'is_add_permission': table.has_add_permission(request.user),
+        'is_add_permission': True if filials else False,
         'search_query': search_query
     })
 
@@ -632,18 +666,44 @@ def export_table(request, table_pk):
 
 
 def check_filial_rights(user, table):
-    filials = Filial.objects.none()
-    filials |= Filial.objects.filter(id=user.profile.employee.id_filial)
-    query = UserFilial.objects.filter(user=user, table=table)
-    for q in query:
+    # Получаем все филиалы пользователя (основной + дополнительные)
+    filials = Filial.objects.filter(id=user.profile.employee.id_filial)
+    additional_filials = UserFilial.objects.filter(user=user, table=table)
+    for q in additional_filials:
         filials |= Filial.objects.filter(id=q.filial.id)
 
-    # Получаем все ID филиалов из filial_permissions одним запросом
-    filial_permission_ids = table.filial_permissions.filter(permission_type__in=['RWD', 'RWN'])\
-        .values_list('filial__id', flat=True)
-    # Фильтруем filials, оставляя только те, чьи ID есть в filial_permission_ids
-    filials = filials.filter(id__in=filial_permission_ids)
-    return filials
+    # Создаем список ID филиалов, которые нужно исключить
+    exclude_ids = []
+
+    for f in filials:
+        print(f)
+        has_filial_permission = TableFilialPermission.objects.filter(
+            filial=f,
+            table=table,
+            permission_type__in=['RWD', 'RWN']
+        ).exists()
+
+        has_user_deny = TablePermission.objects.filter(
+            user=user,
+            filial=f,
+            permission_type='NNN'
+        ).exists()
+
+        has_user_permission = TablePermission.objects.filter(
+            user=user,
+            filial=f,
+            permission_type__in=['RWD', 'RWN']
+        ).exists()
+
+        # Если нет ни одного из разрешающих условий, добавляем в исключения
+        if not ((has_filial_permission and not has_user_deny) or has_user_permission):
+            exclude_ids.append(f.id)
+
+    # Исключаем филиалы без прав доступа
+    if exclude_ids:
+        filials = filials.exclude(id__in=exclude_ids)
+
+    return filials.distinct()
 
 
 def filter_func(queryset, columns, request):

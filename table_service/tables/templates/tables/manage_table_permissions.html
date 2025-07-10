@@ -34,7 +34,7 @@
                         <tr>
                             <th>Пользователь</th>
                             <th>Логин</th>
-                            <th>ID Филиала</th>
+                            <th>Филиал</th>
                             <th>Уровень доступа</th>
                             <th>Действия</th>
                         </tr>
@@ -44,12 +44,12 @@
                         <tr class="user-row">
                             <td class="user-name">{{ perm.user.profile.employee }}</td>
                             <td>{{ perm.user }}</td>
-                            <td>{{ perm.user.profile.employee.id_filial }}</td>
+                            <td>{{ perm.filial }}</td>
                             <td>
                                 <form method="post" style="display: inline;">
                                     {% csrf_token %}
                                     {{ perm.form.permission_type }}
-                                    <button type="submit" name="update_user" value="{{ perm.user.id }}"
+                                    <button type="submit" name="update_user" value="{{ perm.user.id }}|{{ perm.filial.id }}"
                                             class="btn btn-sm btn-primary mt-2">
                                         Обновить
                                     </button>
@@ -58,7 +58,7 @@
                             <td>
                                 <form method="post" style="display:inline;">
                                     {% csrf_token %}
-                                    <input type="hidden" name="user_id" value="{{ perm.user.id }}">
+                                    <input type="hidden" name="user_id" value="{{ perm.user.id }}|{{ perm.filial.id }}">
                                     <button type="submit" name="remove_user" class="btn btn-sm btn-danger"
                                             onclick="return confirm('Удалить пользователя из списка?')">
                                         Удалить
@@ -82,8 +82,11 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-3">
                         {{ user_form.user }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ user_form.filial }}
                     </div>
                     <div class="col-md-4">
                         <select name="permission_type" class="form-select">
@@ -185,6 +188,26 @@
 </div>
 
 <script>
+function updateFilialOptions(userId) {
+    if (!userId) {
+        $('#filialSelect').html('<option value="">---------</option>');
+        return;
+    }
+
+    // URL для получения филиалов пользователя
+    const url = `/ajax/get-user-filials/?user_id=${userId}&table_id={{ table.pk }}`;
+
+    $.get(url, function(data) {
+        const select = $('#filialSelect');
+        select.empty();
+        select.append('<option value="">---------</option>');
+
+        data.filials.forEach(function(filial) {
+            select.append(`<option value="${filial.id}">${filial.name}</option>`);
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Поиск по пользователям в таблице
     document.getElementById('userSearch').addEventListener('input', function(e) {

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
-from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission
+from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission, UserFilial
 
 
 class TableForm(forms.ModelForm):
@@ -30,7 +30,7 @@ class ColumnForm(forms.ModelForm):
 class TablePermissionForm(forms.ModelForm):
     class Meta:
         model = TablePermission
-        fields = ['permission_type']
+        fields = ['filial', 'permission_type']
         widgets = {
             'permission_type': forms.Select(attrs={
                 'class': 'form-select'
@@ -54,7 +54,15 @@ class PermissionUserForm(forms.Form):
         queryset=User.objects.none(),
         widget=forms.Select(attrs={
             'class': 'form-select',
-            'id': 'userSelect'
+            'id': 'userSelect',
+            'onchange': 'updateFilialOptions(this.value)'
+        })
+    )
+    filial = forms.ModelChoiceField(
+        queryset=Filial.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'filialSelect'
         })
     )
 
@@ -67,6 +75,33 @@ class PermissionUserForm(forms.Form):
                 'profile__employee__firstname',
                 'profile__employee__secondname'
             )
+
+            self.fields['filial'].queryset = Filial.objects.none()
+
+            # Если форма передана с данными выбранного пользователя
+            if 'user' in self.data:
+                try:
+                    user_id = int(self.data.get('user'))
+                    user = User.objects.get(id=user_id)
+                    self.set_filial_queryset(user, table)
+                except (ValueError, User.DoesNotExist):
+                    pass
+
+    def set_filial_queryset(self, user, table):
+        """Устанавливает queryset филиалов для конкретного пользователя"""
+        # Получаем основной филиал пользователя
+        main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+
+        # Получаем дополнительные филиалы пользователя для этой таблицы
+        additional_filials = UserFilial.objects.filter(
+            user=user,
+            table=table
+        ).values_list('filial', flat=True)
+        # Собираем все филиалы пользователя
+        filial_ids = [main_filial.id] + list(additional_filials)
+
+        # Устанавливаем queryset для поля filial
+        self.fields['filial'].queryset = Filial.objects.filter(id__in=filial_ids)
 
 
 class PermissionFilialForm(forms.Form):

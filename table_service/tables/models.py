@@ -92,19 +92,21 @@ class Table(models.Model):
             return True
         if self.is_admin(user):
             return True
-        if self.permissions.filter(user=user, permission_type='NNN'):
-            return False
+
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
         query = UserFilial.objects.filter(user=user, table=self)
 
         for q in query:
-            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN']):
+            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN']) \
+                    and not self.permissions.filter(user=user, filial=q.filial, permission_type__in=['RNN', 'NNN']):
+                return True
+            if self.permissions.filter(user=user, filial=q.filial,  permission_type__in=['RWD', 'RWN']):
                 return True
 
-        if self.permissions.filter(user=user, permission_type__in=['RWD', 'RWN']):
+        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN']) \
+                and not self.permissions.filter(user=user, filial=main_filial, permission_type__in=['RNN', 'NNN']):
             return True
-
-        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN']):
+        if self.permissions.filter(user=user, filial=main_filial, permission_type__in=['RWD', 'RWN']):
             return True
         return False
 
@@ -114,19 +116,21 @@ class Table(models.Model):
             return True
         if self.is_admin(user):
             return True
-        if self.permissions.filter(user=user, permission_type='NNN'):
-            return False
+
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
         query = UserFilial.objects.filter(user=user, table=self)
 
         for q in query:
-            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
+            if self.filial_permissions.filter(filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']) \
+                    and not self.permissions.filter(user=user, filial=q.filial,  permission_type='NNN'):
+                return True
+            if self.permissions.filter(user=user, filial=q.filial,  permission_type__in=['RWD', 'RWN', 'RNN']):
                 return True
 
-        if self.permissions.filter(user=user, permission_type__in=['RWD', 'RWN', 'RNN']):
+        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN', 'RNN']) \
+                and not self.permissions.filter(user=user, filial=main_filial,  permission_type='NNN'):
             return True
-
-        if self.filial_permissions.filter(filial=main_filial, permission_type__in=['RWD', 'RWN', 'RNN']):
+        if self.permissions.filter(user=user, filial=main_filial, permission_type__in=['RWD', 'RWN', 'RNN']):
             return True
         return False
 
@@ -218,13 +222,15 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RNN', 'NNN']):
+        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
+
+        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                          permission_type__in=['RNN', 'NNN']):
             return False
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RWD', 'RWN']):
+        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                          permission_type__in=['RWD', 'RWN']):
             return True
-
-        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
@@ -247,13 +253,16 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RNN', 'RWN', 'NNN']):
+        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
+
+        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                          permission_type__in=['RNN', 'RWN', 'NNN']):
             return False
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type='RWD'):
+        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                          permission_type='RWD'):
             return True
 
-        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
         if main_filial == created_by_filial:
@@ -321,15 +330,19 @@ class Row(models.Model):
         result = cls.objects.none()
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
-        if TableFilialPermission.objects.filter(filial=main_filial, table=table,
-                                                permission_type__in=['RWD', 'RWN', 'RNN']):
+        if (TableFilialPermission.objects.filter(filial=main_filial, table=table,
+                                                 permission_type__in=['RWD', 'RWN', 'RNN'])
+            and not TablePermission.objects.filter(user=user, filial=main_filial, permission_type='NNN')) \
+                or TablePermission.objects.filter(user=user, filial=main_filial,permission_type__in=['RWD', 'RWN', 'RNN']):
             result |= cls.objects.filter(created_by__profile__employee__id_filial=main_filial.id).distinct()
 
         query = UserFilial.objects.filter(user=user, table=table)
 
         for q in query:
-            if TableFilialPermission.objects.filter(filial=q.filial, table=table,
-                                                    permission_type__in=['RWD', 'RWN', 'RNN']):
+            if (TableFilialPermission.objects.filter(filial=q.filial, table=table,
+                                                     permission_type__in=['RWD', 'RWN', 'RNN'])
+                and not TablePermission.objects.filter(user=user, filial=q.filial, permission_type='NNN')) \
+                    or TablePermission.objects.filter(user=user, filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
                 result |= cls.objects.filter(created_by__profile__employee__id_filial=q.filial.id).distinct()
 
         return result
@@ -465,6 +478,7 @@ class TablePermission(models.Model):
         NO_ACCESS = 'NNN', 'Нет доступа'
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='permissions')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    filial = models.ForeignKey(Filial, on_delete=models.CASCADE, null=True)
     permission_type = models.CharField(
         max_length=3,
         choices=PermissionType.choices,
