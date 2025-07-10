@@ -207,28 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
             row.style.display = match ? '' : 'none';
         });
     });
-
-    // Фильтр пользователей в select
-    document.getElementById('userFilter').addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase();
-        const options = document.querySelectorAll('#userSelect option');
-
-        options.forEach(option => {
-            const text = option.textContent.toLowerCase();
-            option.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
-    });
-
-    // Фильтр филиалов в select
-    document.getElementById('filialFilter').addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase();
-        const options = document.querySelectorAll('#filialSelect option');
-
-        options.forEach(option => {
-            const text = option.textContent.toLowerCase();
-            option.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
-    });
 });
 </script>
 

@@ -218,21 +218,26 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type='NNN'):
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RNN', 'NNN']):
             return False
 
         if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RWD', 'RWN']):
             return True
 
+        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
+
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
-        if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
-            return True
+        if main_filial == created_by_filial:
+            if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+                return True
 
         query = UserFilial.objects.filter(user=user, table=self.table)
         for q in query:
-            if TableFilialPermission.objects.filter(filial=q.filial, table=self.table, permission_type__in=['RWD', 'RWN']):
-                return True
+            q_filial = q.filial
+            if q_filial == created_by_filial:
+                if TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+                    return True
         return False
 
     def has_delete_permission(self, user):
@@ -242,21 +247,25 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        if TablePermission.objects.filter(user=user, table=self.table, permission_type='NNN'):
+        if TablePermission.objects.filter(user=user, table=self.table, permission_type__in=['RNN', 'RWN', 'NNN']):
             return False
 
         if TablePermission.objects.filter(user=user, table=self.table, permission_type='RWD'):
             return True
 
+        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
-        if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type='RWD'):
-            return True
+        if main_filial == created_by_filial:
+            if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type='RWD'):
+                return True
 
         query = UserFilial.objects.filter(user=user, table=self.table)
         for q in query:
-            if TableFilialPermission.objects.filter(filial=q.filial, table=self.table, permission_type='RWD'):
-                return True
+            q_filial = q.filial
+            if q_filial == created_by_filial:
+                if TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type='RWD'):
+                    return True
         return False
 
     @property
@@ -307,9 +316,6 @@ class Row(models.Model):
         if table.owner == user:
             return table.rows.all()
         if table.is_admin(user):
-            return table.rows.all()
-
-        if TablePermission.objects.filter(user=user, table=table, permission_type__in=['RWD', 'RWN', 'RNN']):
             return table.rows.all()
 
         result = cls.objects.none()
@@ -454,8 +460,8 @@ class UserFilial(models.Model):
 class TablePermission(models.Model):
     class PermissionType(models.TextChoices):
         EDIT_VIEW_DELETE = 'RWD', 'Редактировать + Просмотр + Удалять'
-        VIEW_ONLY = 'RNN', 'Только просмотр'
         EDIT_VIEW = 'RWN', 'Редактировать + Просмотр'
+        VIEW_ONLY = 'RNN', 'Только просмотр'
         NO_ACCESS = 'NNN', 'Нет доступа'
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='permissions')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -470,8 +476,8 @@ class TablePermission(models.Model):
 class TableFilialPermission(models.Model):
     class PermissionType(models.TextChoices):
         EDIT_VIEW_DELETE = 'RWD', 'Редактировать + Просмотр + Удалять'
-        VIEW_ONLY = 'RNN', 'Только просмотр'
         EDIT_VIEW = 'RWN', 'Редактировать + Просмотр'
+        VIEW_ONLY = 'RNN', 'Только просмотр'
         NO_ACCESS = 'NNN', 'Нет доступа'
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='filial_permissions')
     filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
