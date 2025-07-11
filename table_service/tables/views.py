@@ -11,7 +11,7 @@ from django_tables2.export import TableExport
 from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission, \
     TableFilialPermission, Admin, UserFilial
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
-    TablePermissionForm, TableFilialPermissionForm
+    TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -294,7 +294,7 @@ def manage_table_permissions(request, table_pk):
     table = get_object_or_404(Table, pk=table_pk)
 
     if not (table.owner == request.user or table.is_admin(request.user)):
-        return HttpResponseForbidden("Только владелец таблицы может редактировать права на таблицу")
+        return HttpResponseForbidden("Только владелец таблицы или администратор может редактировать права на таблицу")
 
     if request.method == 'POST':
         with transaction.atomic():
@@ -306,7 +306,7 @@ def manage_table_permissions(request, table_pk):
                     perm.permission_type = request.POST[field_name]
                     perm.save()
                 messages.success(request, 'Права пользователей обновлены')
-###ГДЕ-ТО ТУТ НАДО СДЕЛАТЬ ТАК ЧТОБЫ В table.permissions БЫЛО НЕСКОЛЬКО ФИЛИАЛОВ ДЛЯ ОДНОГО ЮЗЕРА
+
             elif 'remove_user' in request.POST:
                 user_id, filial_id = request.POST.get('user_id').split('|')
                 if user_id:
@@ -356,6 +356,26 @@ def manage_table_permissions(request, table_pk):
 
                     messages.success(request, 'Права филиала добавлены')
 
+            elif 'remove_user_filial' in request.POST:
+                print(request.POST)
+                user_id, filial_id = request.POST.get('user_filial_id').split('|')
+                if user_id and filial_id:
+                    UserFilial.objects.filter(table=table, user_id=user_id, filial_id=filial_id).delete()
+                    table.permissions.filter(table=table, user_id=user_id, filial_id=filial_id).delete()
+                    messages.success(request, 'Права пользователя удалены')
+
+            elif 'add_user_filial' in request.POST:
+                user_id = request.POST.get('user')
+                filial_id = request.POST.get('filial')
+                if user_id and filial_id:
+                    UserFilial.objects.update_or_create(
+                        table=table,
+                        user_id=user_id,
+                        filial_id=filial_id,
+                    )
+
+                    messages.success(request, 'Дополнительные права филиала добавлены')
+
         return redirect('manage_table_permissions', table_pk=table.pk)
 
     # Получаем текущие разрешения пользователей для таблицы
@@ -375,12 +395,22 @@ def manage_table_permissions(request, table_pk):
         }, prefix=f'filial_{perm.filial.id}')
         filial_permissions.append(perm)
 
+    userfilial_permissions = []
+    for perm in UserFilial.objects.filter(table=table):
+        perm.form = UserFilialForm(initial={
+            'user': perm.user,
+            'filial': perm.filial
+        })
+        userfilial_permissions.append(perm)
+
     return render(request, 'tables/manage_table_permissions.html', {
         'table': table,
         'permissions': permissions,
         'filial_permissions': filial_permissions,
+        'userfilial_permissions': userfilial_permissions,
         'user_form': PermissionUserForm(table=table),
         'filial_form': PermissionFilialForm(table=table),
+        'user_filial_form': PermissionUserFilialForm(table=table)
     })
 
 
@@ -719,7 +749,6 @@ def get_available_filials_for_adding(user, table):
         return Filial.objects.all()
 
     available_filials = check_filial_rights(user, table)
-    print(available_filials)
 
     # Дополнительно фильтруем только те, где есть права на добавление (RWD/RWN)
     adding_filials = available_filials.filter(

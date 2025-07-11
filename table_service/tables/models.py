@@ -316,11 +316,12 @@ class Row(models.Model):
         result = cls.objects.none()
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
+        print(main_filial)
         if (TableFilialPermission.objects.filter(filial=main_filial, table=table,
                                                  permission_type__in=['RWD', 'RWN', 'RNN'])
             and not TablePermission.objects.filter(user=user, filial=main_filial, permission_type='NNN')) \
                 or TablePermission.objects.filter(user=user, filial=main_filial,permission_type__in=['RWD', 'RWN', 'RNN']):
-            result |= cls.objects.filter(created_by__profile__employee__id_filial=main_filial.id).distinct()
+            result |= cls.objects.filter(filial__id=main_filial.id).distinct()
 
         query = UserFilial.objects.filter(user=user, table=table)
 
@@ -329,7 +330,7 @@ class Row(models.Model):
                                                      permission_type__in=['RWD', 'RWN', 'RNN'])
                 and not TablePermission.objects.filter(user=user, filial=q.filial, permission_type='NNN')) \
                     or TablePermission.objects.filter(user=user, filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
-                result |= cls.objects.filter(created_by__profile__employee__id_filial=q.filial.id).distinct()
+                result |= cls.objects.filter(filial__id=q.filial.id).distinct()
 
         return result
 

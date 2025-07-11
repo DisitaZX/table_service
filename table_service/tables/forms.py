@@ -49,6 +49,36 @@ class TableFilialPermissionForm(forms.ModelForm):
         }
 
 
+class UserFilialForm(forms.ModelForm):
+    class Meta:
+        model = UserFilial
+        fields = ['user', 'filial']
+
+
+class PermissionUserFilialForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'userSelect'
+        })
+    )
+    filial = forms.ModelChoiceField(
+        queryset=Filial.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'filialSelect'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+        if table:
+            self.fields['filial'].queryset = Filial.objects.all()
+            self.fields['user'].queryset = User.objects.all()
+
+
 class PermissionUserForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=User.objects.none(),
