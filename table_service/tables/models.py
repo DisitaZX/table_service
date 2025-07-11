@@ -204,6 +204,7 @@ class Column(models.Model):
 class Row(models.Model):
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='rows')
     order = models.PositiveIntegerField(default=0)
+    filial = models.ForeignKey(Filial, on_delete=models.SET_NULL, null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -222,7 +223,7 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
+        created_by_filial = self.filial
 
         if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
                                           permission_type__in=['RNN', 'NNN']):
@@ -253,7 +254,7 @@ class Row(models.Model):
         if self.table.is_admin(user):
             return True
 
-        created_by_filial = Filial.objects.get(id=self.created_by.profile.employee.id_filial)
+        created_by_filial = self.filial
 
         if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
                                           permission_type__in=['RNN', 'RWN', 'NNN']):
@@ -293,21 +294,6 @@ class Row(models.Model):
                 'full_name': f'{user.secondname} {user.firstname} {user.lastname}' if user else ''
             }
         return self._user_values_cache
-
-    @property
-    def filial_values(self):
-        if not hasattr(self, '_filial_values_cache'):
-            # Получаем филиал через создателя строки (если он есть)
-            filial = None
-            if self.created_by and hasattr(self.created_by, 'profile') and self.created_by.profile.employee:
-                filial_id = self.created_by.profile.employee.id_filial
-                filial = Filial.objects.get(id=filial_id)
-
-            self._filial_values_cache = {
-                'id': filial.id if filial else None,
-                'name': filial.name if filial else '',
-            }
-        return self._filial_values_cache
 
     @property
     def cell_values(self):

@@ -506,14 +506,18 @@ def add_row(request, pk):
 
     columns = table.columns.all()
 
-    if request.method == 'POST':
-        form = AddRowForm(request.POST, table=table, columns=columns)
-        if form.is_valid():
+    available_filials = get_available_filials_for_adding(request.user, table)
 
+    if request.method == 'POST':
+        form = AddRowForm(request.POST, table=table, columns=columns, user=request.user,
+                          available_filials=available_filials)
+        if form.is_valid():
+            selected_filial = form.cleaned_data['filial']
             # Создаем новую строку
             row = Row.objects.create(
                 table=table,
                 order=table.rows.count(),  # Порядковый номер новой строки
+                filial=selected_filial,
                 created_by=request.user
             )
 
@@ -533,7 +537,7 @@ def add_row(request, pk):
         return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
 
     # GET запрос - возвращаем форму
-    form = AddRowForm(table=table, columns=columns)
+    form = AddRowForm(table=table, user=request.user, columns=columns, available_filials=available_filials)
     html = render_to_string('tables/add_row/add_row.html', {
         'form': form,
         'table': table  # Передаем сам объект таблицы
@@ -666,6 +670,7 @@ def export_table(request, table_pk):
 
 
 def check_filial_rights(user, table):
+    """Возвращает филиалы, где пользователь имеет права 'RWD' 'RWN'"""
     # Получаем все филиалы пользователя (основной + дополнительные)
     filials = Filial.objects.filter(id=user.profile.employee.id_filial)
     additional_filials = UserFilial.objects.filter(user=user, table=table)
@@ -676,7 +681,6 @@ def check_filial_rights(user, table):
     exclude_ids = []
 
     for f in filials:
-        print(f)
         has_filial_permission = TableFilialPermission.objects.filter(
             filial=f,
             table=table,
@@ -704,6 +708,31 @@ def check_filial_rights(user, table):
         filials = filials.exclude(id__in=exclude_ids)
 
     return filials.distinct()
+
+
+def get_available_filials_for_adding(user, table):
+    """Возвращает филиалы, где пользователь имеет права на добавление строк"""
+    # Получаем все доступные филиалы с проверкой прав
+    if table.is_admin(user):
+        return Filial.objects.all()
+    if table.owner == user:
+        return Filial.objects.all()
+
+    available_filials = check_filial_rights(user, table)
+    print(available_filials)
+
+    # Дополнительно фильтруем только те, где есть права на добавление (RWD/RWN)
+    adding_filials = available_filials.filter(
+        Q(
+            tablefilialpermission__table=table,
+            tablefilialpermission__permission_type__in=['RWD', 'RWN']
+        ) | Q(
+            tablepermission__user=user,
+            tablepermission__permission_type__in=['RWD', 'RWN']
+        )
+    ).distinct()
+
+    return adding_filials
 
 
 def filter_func(queryset, columns, request):

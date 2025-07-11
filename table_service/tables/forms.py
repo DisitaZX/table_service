@@ -121,12 +121,24 @@ class PermissionFilialForm(forms.Form):
 
 
 class AddRowForm(forms.Form):
-    def __init__(self, *args, columns, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         self.table = kwargs.pop('table', None)
+        self.columns = kwargs.pop('columns', None)
+        self.available_filials = kwargs.pop('available_filials', None)
         super().__init__(*args, **kwargs)
 
-        if self.table:
-            for column in columns:
+        if self.user and self.table:
+            self.fields['filial'] = forms.ModelChoiceField(
+                queryset=self.available_filials,
+                label="Филиал",
+                required=True,
+                widget=forms.Select(attrs={
+                    'class': 'form-select',
+                }),
+                initial=self.user.profile.employee.id_filial
+            )
+            for column in self.columns:
                 field_name = f'col_{column.id}'
                 initial_value = Cell.get_default_value(column.data_type)
 

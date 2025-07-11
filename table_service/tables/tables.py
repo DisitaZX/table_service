@@ -27,7 +27,7 @@ class ExportTable(tables.Table):
                 self._add_column(column)
             self.base_columns['filial'] = tables.Column(
                 verbose_name='Филиал',
-                accessor=f'filial_values.name',
+                accessor=f'filial.name',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
@@ -112,11 +112,11 @@ class DynamicTable(tables.Table):
 
             self.base_columns['filial'] = tables.Column(
                 verbose_name=self.get_column_header(None, is_filial=True),
-                accessor=f'filial_values.name',
+                accessor='filial.name',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
-                order_by='filial_name'
+                order_by='filial__name'
             )
 
             self.base_columns['user'] = tables.Column(

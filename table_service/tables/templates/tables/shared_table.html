@@ -23,26 +23,28 @@
                 </a>
             {% endif %}
         </div>
-<div class="dropdown">
-    <!-- Основная кнопка -->
-    <a href="#" class="btn btn-danger dropdown-toggle"
-       id="revokeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="fas fa-ban"></i> Завершение редактирования
-    </a>
-
-    <!-- Выпадающее меню -->
-    <ul class="dropdown-menu" aria-labelledby="revokeDropdown">
-        <li>
-            {% for perm in filials %}
-                <a class="dropdown-item"
-                   href="{% url 'revoke_redact_rows' share_token=table_obj.share_token id_filial=perm.id%}"
-                   onclick="return confirm('Снять права у всех пользователей филиала {{ perm.name }}?')">
-                    {{ perm }}
+        {% if filials %}
+            <div class="dropdown">
+                <!-- Основная кнопка -->
+                <a href="#" class="btn btn-danger dropdown-toggle"
+                   id="revokeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-ban"></i> Завершение редактирования
                 </a>
-            {% endfor %}
-        </li>
-    </ul>
-</div>
+
+                <!-- Выпадающее меню -->
+                <ul class="dropdown-menu" aria-labelledby="revokeDropdown">
+                    <li>
+                        {% for perm in filials %}
+                            <a class="dropdown-item"
+                               href="{% url 'revoke_redact_rows' share_token=table_obj.share_token id_filial=perm.id%}"
+                               onclick="return confirm('Снять права у всех пользователей филиала {{ perm.name }}?')">
+                                {{ perm }}
+                            </a>
+                        {% endfor %}
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
     </div>
         <form method="get" class="mb-3">
         <div class="input-group">
