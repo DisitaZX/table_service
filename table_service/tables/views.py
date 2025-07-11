@@ -794,7 +794,7 @@ def filter_func(queryset, columns, request):
             Q(created_by__profile__employee__firstname__icontains=search_query) |
             Q(created_by__profile__employee__secondname__icontains=search_query) |
             Q(created_by__profile__employee__lastname__icontains=search_query) |
-            Q(created_by__profile__employee__id_filial__in=filter_filial_ids)
+            Q(filial__id__in=filter_filial_ids)
         ).distinct()
 
         return queryset, search_query
