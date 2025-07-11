@@ -357,7 +357,6 @@ def manage_table_permissions(request, table_pk):
                     messages.success(request, 'Права филиала добавлены')
 
             elif 'remove_user_filial' in request.POST:
-                print(request.POST)
                 user_id, filial_id = request.POST.get('user_filial_id').split('|')
                 if user_id and filial_id:
                     UserFilial.objects.filter(table=table, user_id=user_id, filial_id=filial_id).delete()
@@ -720,7 +719,7 @@ def check_filial_rights(user, table):
         has_user_deny = TablePermission.objects.filter(
             user=user,
             filial=f,
-            permission_type='NNN'
+            permission_type__in=['RNN', 'NNN']
         ).exists()
 
         has_user_permission = TablePermission.objects.filter(
@@ -736,7 +735,7 @@ def check_filial_rights(user, table):
     # Исключаем филиалы без прав доступа
     if exclude_ids:
         filials = filials.exclude(id__in=exclude_ids)
-
+    print(filials)
     return filials.distinct()
 
 

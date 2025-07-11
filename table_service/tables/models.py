@@ -316,7 +316,7 @@ class Row(models.Model):
         result = cls.objects.none()
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
-        print(main_filial)
+
         if (TableFilialPermission.objects.filter(filial=main_filial, table=table,
                                                  permission_type__in=['RWD', 'RWN', 'RNN'])
             and not TablePermission.objects.filter(user=user, filial=main_filial, permission_type='NNN')) \
