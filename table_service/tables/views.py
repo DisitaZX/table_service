@@ -735,7 +735,7 @@ def check_filial_rights(user, table):
     # Исключаем филиалы без прав доступа
     if exclude_ids:
         filials = filials.exclude(id__in=exclude_ids)
-    print(filials)
+
     return filials.distinct()
 
 

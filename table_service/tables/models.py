@@ -319,18 +319,18 @@ class Row(models.Model):
 
         if (TableFilialPermission.objects.filter(filial=main_filial, table=table,
                                                  permission_type__in=['RWD', 'RWN', 'RNN'])
-            and not TablePermission.objects.filter(user=user, filial=main_filial, permission_type='NNN')) \
-                or TablePermission.objects.filter(user=user, filial=main_filial,permission_type__in=['RWD', 'RWN', 'RNN']):
-            result |= cls.objects.filter(filial__id=main_filial.id).distinct()
+            and not TablePermission.objects.filter(table=table, user=user, filial=main_filial, permission_type='NNN')) \
+                or TablePermission.objects.filter(table=table, user=user, filial=main_filial,permission_type__in=['RWD', 'RWN', 'RNN']):
+            result |= cls.objects.filter(table=table, filial__id=main_filial.id).distinct()
 
         query = UserFilial.objects.filter(user=user, table=table)
 
         for q in query:
             if (TableFilialPermission.objects.filter(filial=q.filial, table=table,
                                                      permission_type__in=['RWD', 'RWN', 'RNN'])
-                and not TablePermission.objects.filter(user=user, filial=q.filial, permission_type='NNN')) \
-                    or TablePermission.objects.filter(user=user, filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
-                result |= cls.objects.filter(filial__id=q.filial.id).distinct()
+                and not TablePermission.objects.filter(table=table, user=user, filial=q.filial, permission_type='NNN')) \
+                    or TablePermission.objects.filter(table=table, user=user, filial=q.filial, permission_type__in=['RWD', 'RWN', 'RNN']):
+                result |= cls.objects.filter(table=table, filial__id=q.filial.id).distinct()
 
         return result
 
