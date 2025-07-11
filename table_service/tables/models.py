@@ -298,23 +298,6 @@ class Row(models.Model):
         return False
 
     @property
-    def user_values(self):
-        if not hasattr(self, '_user_values_cache'):
-            # Получаем пользователя через создателя строки (если он есть)
-            user = None
-            if self.created_by and hasattr(self.created_by, 'profile') and self.created_by.profile.employee:
-                user = self.created_by.profile.employee
-
-            self._user_values_cache = {
-                'id': user.id if user else None,
-                'firstname': user.firstname if user else '',
-                'secondname': user.secondname if user else '',
-                'lastname': user.lastname if user else '',
-                'full_name': f'{user.secondname} {user.firstname} {user.lastname}' if user else ''
-            }
-        return self._user_values_cache
-
-    @property
     def cell_values(self):
         if not hasattr(self, '_cell_values_cache'):
             cells = self.cells.select_related('column').all()

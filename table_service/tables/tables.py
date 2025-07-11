@@ -121,11 +121,11 @@ class DynamicTable(tables.Table):
 
             self.base_columns['user'] = tables.Column(
                 verbose_name=self.get_column_header(None, is_user=True),
-                accessor=f'user_values.full_name',
+                accessor=f'created_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
-                order_by='user_full_name'
+                order_by='created_by__profile__employee'
             )
             self.base_columns['actions'] = tables.Column(
                 empty_values=(),
