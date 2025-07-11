@@ -36,7 +36,7 @@ class ExportTable(tables.Table):
 
             self.base_columns['user'] = tables.Column(
                 verbose_name='Пользователь',
-                accessor=f'user_values.full_name',
+                accessor=f'created_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
@@ -125,7 +125,7 @@ class DynamicTable(tables.Table):
                 attrs={
                     'td': {'class': 'text-center'}
                 },
-                order_by='created_by__profile__employee'
+                order_by='created_by__profile__employee__secondname'
             )
             self.base_columns['actions'] = tables.Column(
                 empty_values=(),
