@@ -8,7 +8,13 @@ from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPer
 class TableForm(forms.ModelForm):
     class Meta:
         model = Table
-        fields = ['title']
+        fields = ['title', 'is_edit_only_you']
+
+        widgets = {
+            'is_edit_only_you': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
 
 
 class ColumnForm(forms.ModelForm):

@@ -67,6 +67,7 @@ class Table(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField()
     share_token = models.CharField(max_length=32, unique=True, blank=True)
+    is_edit_only_you = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if not self.share_token:
@@ -165,7 +166,7 @@ class Table(models.Model):
 
 class Admin(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(default=datetime.datetime.now())
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Администратор сервиса'
@@ -229,21 +230,30 @@ class Row(models.Model):
                                           permission_type__in=['RNN', 'NNN']):
             return False
 
-        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
-                                          permission_type__in=['RWD', 'RWN']):
+        req = TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                             permission_type__in=['RWD', 'RWN'])
+        if req and not self.table.is_edit_only_you:
+            return True
+        elif req and self.table.is_edit_only_you and self.created_by == user:
             return True
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
         if main_filial == created_by_filial:
-            if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+            req = TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type__in=['RWD', 'RWN'])
+            if req and not self.table.is_edit_only_you:
+                return True
+            elif req and self.table.is_edit_only_you and self.created_by == user:
                 return True
 
         query = UserFilial.objects.filter(user=user, table=self.table)
         for q in query:
             q_filial = q.filial
             if q_filial == created_by_filial:
-                if TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type__in=['RWD', 'RWN']):
+                req = TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type__in=['RWD', 'RWN'])
+                if req and not self.table.is_edit_only_you:
+                    return True
+                elif req and self.table.is_edit_only_you and self.created_by == user:
                     return True
         return False
 
@@ -260,21 +270,30 @@ class Row(models.Model):
                                           permission_type__in=['RNN', 'RWN', 'NNN']):
             return False
 
-        if TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
-                                          permission_type='RWD'):
+        req = TablePermission.objects.filter(user=user, table=self.table, filial=created_by_filial,
+                                             permission_type='RWD')
+        if req and not self.table.is_edit_only_you:
+            return True
+        elif req and self.table.is_edit_only_you and self.created_by == user:
             return True
 
         main_filial = Filial.objects.get(id=user.profile.employee.id_filial)
 
         if main_filial == created_by_filial:
-            if TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type='RWD'):
+            req = TableFilialPermission.objects.filter(filial=main_filial, table=self.table, permission_type='RWD')
+            if req and not self.table.is_edit_only_you:
+                return True
+            elif req and self.table.is_edit_only_you and self.created_by == user:
                 return True
 
         query = UserFilial.objects.filter(user=user, table=self.table)
         for q in query:
             q_filial = q.filial
             if q_filial == created_by_filial:
-                if TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type='RWD'):
+                req = TableFilialPermission.objects.filter(filial=q_filial, table=self.table, permission_type='RWD')
+                if req and not self.table.is_edit_only_you:
+                    return True
+                elif req and self.table.is_edit_only_you and self.created_by == user:
                     return True
         return False
 

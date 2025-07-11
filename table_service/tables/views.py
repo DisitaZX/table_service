@@ -262,20 +262,21 @@ def manage_column_permissions(request, table_pk, column_pk):
 @login_required
 def manage_admins(request):
     if request.method == 'POST':
-        if 'add_admin' in request.POST:
-            with transaction.atomic():
-                user_id = request.POST.get('new_admin')
-                if user_id:
-                    user = get_object_or_404(User, pk=user_id)
-                    Admin.objects.get_or_create(user=user)
-                    messages.success(request, f'{user.username} добавлен как администратор')
+        with transaction.atomic():
+            if 'add_admin' in request.POST:
+                with transaction.atomic():
+                    user_id = request.POST.get('new_admin')
+                    if user_id:
+                        user = get_object_or_404(User, pk=user_id)
+                        Admin.objects.get_or_create(user=user)
+                        messages.success(request, f'{user.username} добавлен как администратор')
 
-        if 'remove_admin' in request.POST:
-            with transaction.atomic():
-                admin_id = request.POST.get('admin_id')
-                if admin_id:
-                    Admin.objects.filter(pk=admin_id).delete()
-                    messages.success(request, 'Администратор удален')
+            if 'remove_admin' in request.POST:
+                with transaction.atomic():
+                    admin_id = request.POST.get('admin_id')
+                    if admin_id:
+                        Admin.objects.filter(pk=admin_id).delete()
+                        messages.success(request, 'Администратор удален')
 
         return redirect('manage_admins')
 

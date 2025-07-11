@@ -25,8 +25,24 @@
                                 {{ form.title.errors|join:", " }}
                             </div>
                         {% endif %}
-                    </div>
 
+                        <div class="form-check mt-3">
+                            {{ form.is_edit_only_you }}
+                            <div class="d-flex flex-column">
+                                <label class="form-check-label" for="{{ form.is_edit_only_you.id_for_label }}">
+                                    Редактировать свои
+                                </label>
+                                <small class="form-text text-muted">
+                                    Если отмечено, то в таблице можно редактировать только свои строки
+                                </small>
+                            </div>
+                            {% if form.is_edit_only_you.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.is_edit_only_you.errors|join:", " }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{% url 'table_list' %}" class="btn btn-secondary me-md-2">
                             <i class="fas fa-times me-1"></i> Отмена
@@ -46,10 +62,8 @@
 <script>
 // Добавляем класс form-control ко всем input в форме
 document.addEventListener('DOMContentLoaded', function() {
-    const inputs = document.querySelectorAll('input');
-    inputs.forEach(input => {
-        input.classList.add('form-control');
-    });
+    document.getElementById('id_title').classList.add('form-control');
+    document.getElementById('id_is_edit_only_you').classList.add('form-check-input');
 });
 </script>
 {% endblock %}
