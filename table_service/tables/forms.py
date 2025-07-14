@@ -33,6 +33,42 @@ class ColumnForm(forms.ModelForm):
     }
 
 
+class ColumnEditForm(forms.ModelForm):
+    class Meta:
+        model = Column
+        fields = ['name', 'order', 'data_type', 'is_required']
+        widgets = {
+            'order': forms.NumberInput(attrs={'min': 0}),
+            'data_type': forms.Select(choices=Column.ColumnType.choices),
+            'is_required': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+
+    labels = {
+        'is_required': 'Обязательное поле'
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_order(self):
+        order = self.cleaned_data['order']
+        if self.table:
+            old_order = self.instance.order if self.instance else None
+            # Проверяем, занят ли этот порядок другой колонкой
+            conflicting_columns = Column.objects.filter(
+                table=self.table,
+                order=order
+            ).exclude(pk=self.instance.pk if self.instance else None)
+            for col in conflicting_columns:
+                col.order = old_order
+                col.save()
+
+        return order
+
+
 class TablePermissionForm(forms.ModelForm):
     class Meta:
         model = TablePermission
@@ -176,9 +212,9 @@ class AddRowForm(forms.Form):
             )
             for column in self.columns:
                 field_name = f'col_{column.id}'
-                initial_value = Cell.get_default_value(column.data_type)
 
                 required = column.is_required
+                initial_value = Cell.get_default_value(column.data_type) if not required else None
 
                 if column.data_type == Column.ColumnType.INTEGER:
                     self.fields[field_name] = forms.IntegerField(
@@ -251,7 +287,6 @@ class RowEditForm(forms.Form):
 
                 field_name = f'col_{column.id}'
                 required = column.is_required
-
                 if column.data_type == Column.ColumnType.INTEGER:
                     self.fields[field_name] = forms.IntegerField(
                         label=column.name,
@@ -306,29 +341,3 @@ class RowEditForm(forms.Form):
                             'placeholder': 'Введите текст'
                         }),
                     )
-
-    def clean(self):
-        cleaned_data = super().clean()
-
-        for field_name, value in cleaned_data.items():
-            column_id = int(field_name.split('_')[1])
-            column = Column.objects.get(id=column_id)
-            value_type = type(value)
-
-            if column.is_required and value in [None, '']:
-                self.add_error(field_name, ValidationError(
-                    'Это поле обязательно для заполнения',
-                    code='required'
-                ))
-
-            if column.data_type == Column.ColumnType.FLOAT:
-                if value_type is not float:
-                    self.add_error(column, ValidationError('Invalid value', code='Должно быть float числом'))
-            elif column.data_type == Column.ColumnType.INTEGER:
-                if value_type is not int:
-                    self.add_error(column, ValidationError('Invalid value', code='Должно быть int числом'))
-            elif column.data_type == Column.ColumnType.BOOLEAN:
-                if value_type is not bool:
-                    self.add_error(column, ValidationError('Invalid value', code='Должно быть true/false'))
-            elif column.data_type == Column.ColumnType.DATE:
-                pass  # Пока не реализовано

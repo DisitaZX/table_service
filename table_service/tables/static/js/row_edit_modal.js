@@ -15,27 +15,60 @@ function getCookie(name) {
 
 document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-row-btn')) {
+            const btn = e.target.closest('.delete-row-btn');
+            const rowId = btn.dataset.rowId;
+            const tableId = btn.dataset.tableId;
+
+            if (confirm('Вы уверены, что хотите удалить эту строку?')) {
+                fetch(`/${tableId}/delete_row/${rowId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Произошла ошибка при удалении');
+                });
+            }
+        }
         if (e.target.closest('.add-row-btn')) {
             const btn = e.target.closest('.add-row-btn');
             const tableId = btn.dataset.tableId;
 
             const modal = new bootstrap.Modal(document.getElementById('addRowModal'));
             modal.show();
-            // Загрузка формы
-            fetch(`/${tableId}/add_row/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        document.getElementById('addRowModalContent').innerHTML = data.html;
-                    } else {
-                        alert('Ошибка загрузки формы');
+            modal._element.addEventListener('shown.bs.modal', function onShown() {
+                modal._element.removeEventListener('shown.bs.modal', onShown);
+                // Загрузка формы
+                fetch(`/${tableId}/add_row/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById('addRowModalContent').innerHTML = data.html;
+                        } else if (data.status === 'error') {
+                            alert(data.message);
+                            modal.hide();
+                        } else {
+                            alert('Ошибка загрузки формы');
+                            modal.hide();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
                         modal.hide();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    modal.hide();
-                });
+                    });
+            })
         }
         if (e.target.closest('.edit-row-btn')) {
             const btn = e.target.closest('.edit-row-btn');
@@ -86,6 +119,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.status === 'success') {
                             document.getElementById('modalContent').innerHTML = data.html;
+                        } else if (data.status === 'error'){
+                            alert(data.message);
+                            modal.hide();
                         } else {
                             alert('Ошибка загрузки формы');
                             modal.hide();

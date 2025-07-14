@@ -6,12 +6,13 @@ from django.contrib.auth.models import User
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseForbidden
+from django.urls import reverse
 from django.template.loader import render_to_string
 from django_tables2.export import TableExport
 from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission, \
     TableFilialPermission, Admin, UserFilial
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
-    TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm
+    TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -133,131 +134,26 @@ def add_column(request, pk):
         form = ColumnForm()
     return render(request, 'tables/add_column/add_column.html', {'form': form, 'table': table})
 
-"""
+
 @login_required
-def manage_column_permissions(request, table_pk, column_pk):
-    table = get_object_or_404(Table, pk=table_pk)
+def edit_column(request, pk, column_pk):
+    table = get_object_or_404(Table, pk=pk)
     column = get_object_or_404(Column, pk=column_pk, table=table)
+    # Проверка прав (только владелец может редактировать колонки)
+    if not (table.owner == request.user or table.is_admin(request.user)):
+        return HttpResponseForbidden("Вы не можете добавлять колонки в эту таблицу")
 
     if request.method == 'POST':
-        print(request.POST)
-        if 'update_user' in request.POST:
+        form = ColumnEditForm(request.POST, instance=column, table=table)
+        if form.is_valid():
             with transaction.atomic():
-                user_id = int(request.POST['update_user'])
-                perm = column.permissions.get(user_id=user_id, column_id=column_pk)
-                field_name = f'user_{perm.user.id}-permission_type'
-                if field_name in request.POST:
-                    perm.permission_type = request.POST[field_name]
-                    perm.save()
-                messages.success(request, 'Права пользователей обновлены')
+                form.save()
+                messages.success(request, f'Колонка успешно обновлена')
+                return redirect('table_detail', pk=table.pk)
+    else:
+        form = ColumnEditForm(instance=column, table=table)
+    return render(request, 'tables/add_column/edit_column.html', {'form': form, 'table': table, 'column': column})
 
-        elif 'remove_user' in request.POST:
-            with transaction.atomic():
-                user_id = request.POST.get('user_id')
-                if user_id:
-                    column.permissions.filter(user_id=user_id).delete()
-                    messages.success(request, 'Права пользователя удалены')
-
-        elif 'add_user' in request.POST:
-            with transaction.atomic():
-                user_id = request.POST.get('user')
-                permission_type = request.POST.get('permission_type')
-                if user_id and permission_type:
-                    ColumnPermission.objects.update_or_create(
-                        column=column,
-                        user_id=user_id,
-                        defaults={'permission_type': permission_type}
-                    )
-                    messages.success(request, 'Права пользователя добавлены')
-
-        elif 'update_filial' in request.POST:
-            with transaction.atomic():
-                filial_id = int(request.POST['update_filial'])
-                perm = column.filial_permissions.get(filial_id=filial_id, column_id=column_pk)
-                field_name = f'filial_{perm.filial.id}-permission_type'
-                if field_name in request.POST:
-                    perm.permission_type = request.POST[field_name]
-                    perm.save()
-
-                users = User.objects.filter(
-                    profile__employee__id_filial=filial_id
-                )
-                for user in users:
-                    ColumnPermission.objects.update_or_create(
-                        column=column,
-                        user=user,
-                        defaults={'permission_type': perm.permission_type}
-                    )
-                messages.success(request, 'Права филиала обновлены')
-
-        elif 'remove_filial' in request.POST:
-            with transaction.atomic():
-                filial_id = request.POST.get('filial_id')
-                if filial_id:
-                    column.filial_permissions.filter(filial_id=filial_id).delete()
-
-                    users = User.objects.filter(
-                        profile__employee__id_filial=filial_id
-                    )
-
-                    for user in users:
-                        ColumnPermission.objects.filter(
-                            column=column,
-                            user=user,
-                        ).delete()
-
-                    messages.success(request, 'Права филиала удалены')
-
-        elif 'add_filial' in request.POST:
-            with transaction.atomic():
-                filial_id = request.POST.get('filial')
-                permission_type = request.POST.get('permission_type')
-                if filial_id and permission_type:
-                    ColumnFilialPermission.objects.update_or_create(
-                        column=column,
-                        filial_id=filial_id,
-                        defaults={'permission_type': permission_type}
-                    )
-                    users = User.objects.filter(
-                        profile__employee__id_filial=filial_id
-                    )
-                    for user in users:
-                        ColumnPermission.objects.update_or_create(
-                            column=column,
-                            user=user,
-                            defaults={'permission_type': permission_type}
-                        )
-
-                    messages.success(request, 'Права филиала добавлены')
-
-        return redirect('manage_column_permissions', table_pk=table.pk, column_pk=column.pk)
-
-    # Получаем текущие права
-    user_permissions = []
-    for perm in column.permissions.all():
-        perm.form = ColumnPermissionForm(initial={
-            'permission_type': perm.permission_type
-        }, prefix=f'user_{perm.user.id}')
-        user_permissions.append(perm)
-
-    filial_permissions = []
-    for perm in column.filial_permissions.all():
-        perm.form = ColumnFilialPermissionForm(initial={
-            'permission_type': perm.permission_type
-        }, prefix=f'filial_{perm.filial.id}')
-        filial_permissions.append(perm)
-
-    context = {
-        'table': table,
-        'column': column,
-        'permissions': user_permissions,
-        'filial_permissions': filial_permissions,
-        'user_form': ColumnPermissionUserForm(table=table),
-        'filial_form': ColumnPermissionFilialForm(table=table),
-    }
-
-    return render(request, 'tables/manage_column_permissions.html', context)
-"""
 
 @login_required
 def manage_admins(request):
@@ -443,7 +339,7 @@ def revoke_redact_rows(request, share_token, id_filial):
         return redirect('shared_table_view', share_token=table.share_token)
 
     except Exception as e:
-        messages.error(request, f'Ошибка при снятии прав: {str(e)}')
+        messages.error(request, f'Ошибка при снятии прав')
         return redirect('shared_table_view', share_token=table.share_token)
 
 
@@ -476,9 +372,10 @@ def delete_row(request, table_pk, row_pk):
     messages.success(request, 'Строка успешно удалена')
 
     if request.user == table.owner:
-        return redirect('table_detail', pk=table.pk)
+        return JsonResponse({'status': 'success', 'redirect_url': reverse('table_detail', kwargs={'pk': table.pk})})
     else:
-        return redirect('shared_table_view', share_token=table.share_token)
+        return JsonResponse({'status': 'success', 'redirect_url': reverse('shared_table_view',
+                                                                          kwargs={'share_token': table.share_token})})
 
 
 @require_POST
@@ -532,7 +429,7 @@ def add_row(request, pk):
     table = get_object_or_404(Table, pk=pk)
 
     if not table.has_add_permission(request.user):
-        return HttpResponseForbidden("Вы не можете добавлять строки в эту таблицу")
+        return JsonResponse({'status': 'error', 'message': "Вы не можете добавлять строки в эту таблицу"}, status=403)
 
     columns = table.columns.all()
 

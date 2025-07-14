@@ -171,19 +171,12 @@ class DynamicTable(tables.Table):
                 self.table_obj.pk
             )
         if record.has_delete_permission(self.request.user):
-            delete_url = reverse('delete_row',
-                                 kwargs={'table_pk': self.table_obj.pk,
-                                         'row_pk': record.id
-                                         })
             edit += format_html(
-                '<form method="post" action="{}" style="display:inline;">{}'
-                '<button type="submit" '
-                'class="btn btn-sm btn-danger" '
-                'onclick="return confirm(\'Удалить строку?\');">'
-                '<i class="bi bi-x-lg"></i></button>'
-                '</form>',
-                delete_url,
-                csrf_input(self.request)
+                '<a class="btn btn-sm btn-danger delete-row-btn"'
+                'title="Удалить строку" data-row-id="{}" data-table-id="{}">'
+                '<i class="bi bi-x-lg"></i></a>',
+                record.id,
+                self.table_obj.pk
             )
         return edit
 
@@ -195,11 +188,21 @@ class DynamicTable(tables.Table):
                                      'table_pk': self.table_obj.pk,
                                      'column_pk': column.id
                                  })
+            edit_column = reverse('edit_column',
+                                  kwargs={
+                                      'pk': self.table_obj.pk,
+                                      'column_pk': column.id
+                                  })
             edit += format_html(
                 '<div class="d-flex align-items-center">'
                 '<div>{}</div>'
                 '<div class="d-flex mr-auto p-2">'
-                '<form method="post" action="{}"">{}'
+                '<form method="get" action="{}">'
+                '<button type="submit" '
+                'class="btn btn-sm btn-outline-primary">'
+                '<i class="bi bi-pen"></i></button>'
+                '</form>'
+                '<form method="post" action="{}">{}'
                 '<button type="submit" '
                 'class="btn btn-sm btn-danger" '
                 'onclick="return confirm(\'Удалить столбец?\');">'
@@ -208,6 +211,7 @@ class DynamicTable(tables.Table):
                 '</div>'
                 '</div>',
                 column.name,
+                edit_column,
                 delete_url,
                 csrf_input(self.request)
             )

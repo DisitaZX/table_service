@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактировать столбец в {{ table.title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-columns me-2"></i>
+                    Редактировать столбец № {{ column.pk }} в таблице "{{ table.title }}"
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Название столбца
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.name.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <label class="form-label mt-3">
+                            Нумерация места столбца
+                        </label>
+                        {{ form.order }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.name.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <label class="form-label mt-3">
+                            Тип данных:
+                        </label>
+                        {{ form.data_type }}
+                        {% if form.data_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.data_type.errors|join:", " }}
+                            </div>
+                        {% endif %}
+
+                        <div class="form-check mt-3">
+                            {{ form.is_required }}
+                            <div class="d-flex flex-column">
+                                <label class="form-check-label" for="{{ form.is_required.id_for_label }}">
+                                    Обязательное поле
+                                </label>
+                                <small class="form-text text-muted">
+                                    Если отмечено, поле должно быть заполнено при создании/редактировании строки
+                                </small>
+                            </div>
+                            {% if form.is_required.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.is_required.errors|join:", " }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'table_detail' table.pk %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-arrow-left me-1"></i> Назад к таблице
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            Обновить столбец
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Добавляем классы Bootstrap к элементам формы
+    document.getElementById('id_name').classList.add('form-control');
+    document.getElementById('id_order').classList.add('form-control');
+    document.getElementById('id_data_type').classList.add('form-select');
+    document.getElementById('id_is_required').classList.add('form-check-input');
+});
+</script>
+{% endblock %}

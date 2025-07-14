@@ -11,6 +11,7 @@ urlpatterns = [
     path('<int:pk>/', views.table_detail, name='table_detail'),
     path('<int:pk>/delete_table', views.delete_table, name='delete_table'),
     path('<int:pk>/add_column/', views.add_column, name='add_column'),
+    path('<int:pk>/<int:column_pk>/edit_column/', views.edit_column, name='edit_column'),
     path('<int:pk>/add_row/', views.add_row, name='add_row'),
     path('<int:table_pk>/delete_column/<int:column_pk>/', views.delete_column, name='delete_column'),
     path('<int:table_pk>/delete_row/<int:row_pk>/', views.delete_row, name='delete_row'),
