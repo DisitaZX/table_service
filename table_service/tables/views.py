@@ -318,28 +318,40 @@ def revoke_redact_rows(request, share_token, id_filial):
         return HttpResponseForbidden("У вас нет прав на завершение редактирования этой таблицы")
 
     try:
-        filial = Filial.objects.get(id=id_filial)
         with transaction.atomic():
-            TableFilialPermission.objects.update_or_create(
-                table=table,
-                filial=filial,
-                defaults={
-                    'permission_type': 'RNN'
-                }
-            )
-            TablePermission.objects.update_or_create(
-                table=table,
-                filial=filial,
-                defaults={
-                    'permission_type': 'RNN'
-                }
-            )
+            if id_filial:
+                filial = Filial.objects.get(id=id_filial)
 
-        messages.success(request, f'Права редактирования для филиала {filial.name} сняты со всех строк')
+                TableFilialPermission.objects.update_or_create(
+                    table=table,
+                    filial=filial,
+                    defaults={
+                        'permission_type': 'RNN'
+                    }
+                )
+                TablePermission.objects.update_or_create(
+                    table=table,
+                    filial=filial,
+                    defaults={
+                        'permission_type': 'RNN'
+                    }
+                )
+
+                messages.success(request, f'Права редактирования для филиала {filial.name} сняты со всех строк')
+            else:
+                TableFilialPermission.objects.filter(table=table).update(permission_type='RNN')
+                TablePermission.objects.filter(table=table).update(permission_type='RNN')
+
+                messages.success(request, f'Права редактирования для всех пользователей и филиалов сняты со всех строк')
+
+        if table.owner == request.user or table.is_admin(request.user):
+            return redirect('table_detail', pk=table.pk)
         return redirect('shared_table_view', share_token=table.share_token)
 
     except Exception as e:
-        messages.error(request, f'Ошибка при снятии прав')
+        messages.error(request, f'Ошибка при снятии прав: {str(e)}')
+        if table.owner == request.user or table.is_admin(request.user):
+            return redirect('table_detail', pk=table.pk)
         return redirect('shared_table_view', share_token=table.share_token)
 
 
@@ -535,9 +547,18 @@ def table_detail(request, pk):
 
     table = DynamicTable(data=queryset, table_obj=table_obj, columns=columns, request=request)
     RequestConfig(request).configure(table)
+
+    filials = Filial.objects.filter(
+        Q(tablefilialpermission__table=table_obj,
+          tablefilialpermission__permission_type__in=['RWD', 'RWN']) |
+        Q(tablepermission__table=table_obj,
+          tablepermission__permission_type__in=['RWD', 'RWN'])
+    ).distinct()
+
     return render(request, 'tables/table_detail.html', {
         'table_obj': table_obj,
         'table': table,
+        'filials': filials,
         'is_admin': table_obj.is_admin(request.user),
         'search_query': search_query
     })

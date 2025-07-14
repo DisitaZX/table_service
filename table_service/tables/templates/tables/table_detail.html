@@ -35,6 +35,33 @@
            onclick="return confirm('Удалить таблицу?')">
             <i class="fas fa-ban"></i> Удалить таблицу
         </a>
+        {% if filials %}
+            <div class="dropdown mt-2">
+                <!-- Основная кнопка -->
+                <a href="#" class="btn btn-danger dropdown-toggle"
+                   id="revokeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-ban"></i> Завершение редактирования
+                </a>
+
+                <!-- Выпадающее меню -->
+                <ul class="dropdown-menu" aria-labelledby="revokeDropdown">
+                    <li>
+                        <a class="dropdown-item"
+                           href="{% url 'revoke_redact_rows' share_token=table_obj.share_token id_filial=0%}"
+                           onclick="return confirm('Снять права у всех пользователей и филиалов?')">
+                            Все
+                        </a>
+                        {% for perm in filials %}
+                            <a class="dropdown-item"
+                               href="{% url 'revoke_redact_rows' share_token=table_obj.share_token id_filial=perm.id%}"
+                               onclick="return confirm('Снять права у всех пользователей филиала {{ perm.name }}?')">
+                                {{ perm }}
+                            </a>
+                        {% endfor %}
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
     </div>
 {% endif %}
 </div>

@@ -138,6 +138,8 @@ class Table(models.Model):
     @classmethod
     def get_shared_tables(cls, user):
         """Возвращает все таблицы, к которым у пользователя есть доступ"""
+        if Admin.objects.filter(user=user).exists():
+            return cls.objects.all()
         # Таблицы, где пользователь явно указан в TablePermission
         shared_via_permissions = cls.objects.filter(
             permissions__user=user,
@@ -150,14 +152,13 @@ class Table(models.Model):
             filial_permissions__filial=main_filial,
         ).distinct()
 
-        """
         # Таблицы, где доп филиалы пользователя явно указаны в TableFilialPermission
         query = UserFilial.objects.filter(user=user)
         for q in query:
             shared_via_permissions |= cls.objects.filter(
                 filial_permissions__filial=q.filial,
             ).distinct()
-        """
+
         return shared_via_permissions
 
     def __str__(self):
