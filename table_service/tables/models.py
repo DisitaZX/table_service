@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile, InMemoryUploadedFile
 from django.core.validators import EmailValidator, URLValidator
 from django.db import models
 from django.contrib.auth.models import User
@@ -184,6 +185,7 @@ class Column(models.Model):
         DATE = 'date', 'Дата'
         EMAIL = 'email', 'Почта'
         URL = 'url', 'Ссылка'
+        FILE = 'file', 'Файл'
 
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='columns')
     name = models.CharField(max_length=100)
@@ -366,7 +368,7 @@ class Row(models.Model):
                 column_id=column_id
             ).values('positive_integer_value')[:1]
             return queryset.annotate(
-                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=IntegerField())}
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=models.PositiveIntegerField())}
             )
         elif data_type == Column.ColumnType.EMAIL:
             subquery = Cell.objects.filter(
@@ -374,7 +376,7 @@ class Row(models.Model):
                 column_id=column_id
             ).values('email_value')[:1]
             return queryset.annotate(
-                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=TextField())}
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=models.EmailField())}
             )
         elif data_type == Column.ColumnType.URL:
             subquery = Cell.objects.filter(
@@ -382,7 +384,15 @@ class Row(models.Model):
                 column_id=column_id
             ).values('url_value')[:1]
             return queryset.annotate(
-                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=TextField())}
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=models.URLField())}
+            )
+        elif data_type == Column.ColumnType.FILE:
+            subquery = Cell.objects.filter(
+                row=models.OuterRef('pk'),
+                column_id=column_id
+            ).values('file_value')[:1]
+            return queryset.annotate(
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=models.FileField())}
             )
         elif data_type == Column.ColumnType.BOOLEAN:
             subquery = Cell.objects.filter(
@@ -430,6 +440,7 @@ class Cell(models.Model):
     positive_integer_value = models.PositiveIntegerField(blank=True, null=True)
     email_value = models.EmailField(blank=True, null=True)
     url_value = models.URLField(blank=True, null=True)
+    file_value = models.FileField(blank=True, null=True, upload_to='files/')
     float_value = models.FloatField(blank=True, null=True)
     boolean_value = models.BooleanField(blank=True, null=True)
     date_value = models.DateField(blank=True, null=True)
@@ -445,6 +456,7 @@ class Cell(models.Model):
             Column.ColumnType.POSITIVE_INTEGER: 1,
             Column.ColumnType.EMAIL: 'example@mail.ru',
             Column.ColumnType.URL: 'http://example.ru',
+            Column.ColumnType.FILE: None,
             Column.ColumnType.FLOAT: 0.0,
             Column.ColumnType.BOOLEAN: False,
             Column.ColumnType.DATE: date.today(),
@@ -463,6 +475,8 @@ class Cell(models.Model):
             return self.email_value
         elif self.column.data_type == Column.ColumnType.URL:
             return self.url_value
+        elif self.column.data_type == Column.ColumnType.FILE:
+            return self.file_value
         elif self.column.data_type == Column.ColumnType.FLOAT:
             return self.float_value
         elif self.column.data_type == Column.ColumnType.BOOLEAN:
@@ -499,6 +513,18 @@ class Cell(models.Model):
                     self.url_value = None
             else:
                 self.url_value = None
+        elif self.column.data_type == Column.ColumnType.FILE:
+            #validators = [FileExtensionValidator(allowed_extensions=['pdf', 'docx'])]
+            if val is not None:
+                try:
+                    if isinstance(val, (UploadedFile, InMemoryUploadedFile)):
+                        self.file_value = val
+                    else:
+                        self.file_value = None
+                except Exception as e:
+                    self.file_value = None
+            else:
+                self.file_value = None
         elif self.column.data_type == Column.ColumnType.FLOAT:
             self.float_value = float(val) if val is not None else None
         elif self.column.data_type == Column.ColumnType.BOOLEAN:

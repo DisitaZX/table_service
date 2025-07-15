@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.utils.safestring import mark_safe
 
 from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission, UserFilial
 
@@ -262,6 +262,16 @@ class AddRowForm(forms.Form):
                             'placeholder': 'Введите ссылку'
                         }),
                     )
+                elif column.data_type == Column.ColumnType.FILE:
+                    self.fields[field_name] = forms.FileField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.FileInput(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Загрузите файл'
+                        }),
+                    )
                 elif column.data_type == Column.ColumnType.FLOAT:
                     self.fields[field_name] = forms.FloatField(
                         label=column.name,
@@ -366,6 +376,16 @@ class RowEditForm(forms.Form):
                             'placeholder': 'Введите ссылку'
                         }),
                     )
+                elif column.data_type == Column.ColumnType.FILE:
+                    self.fields[field_name] = forms.FileField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=FileInputWithPreview(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Загрузите файл'
+                        }),
+                    )
                 elif column.data_type == Column.ColumnType.FLOAT:
                     self.fields[field_name] = forms.FloatField(
                         label=column.name,
@@ -407,3 +427,20 @@ class RowEditForm(forms.Form):
                             'placeholder': 'Введите текст'
                         }),
                     )
+
+
+class FileInputWithPreview(forms.FileInput):
+    def render(self, name, value, attrs=None, renderer=None):
+        output = []
+        if value and hasattr(value, 'url'):
+            output.append(
+                f'<div class="current-file">'
+                f'<span>Текущий файл: </span>'
+                f'<a href="{value.url}" target="_blank">{value.name}</a>'
+                f'<label class="delete-file-checkbox">'
+                f'<input type="checkbox" name="{name}-clear"> Удалить файл'
+                f'</label>'
+                f'</div>'
+            )
+        output.append(super().render(name, value, attrs, renderer))
+        return mark_safe('\n'.join(output))

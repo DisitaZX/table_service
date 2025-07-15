@@ -62,6 +62,7 @@ class ExportTable(tables.Table):
             Column.ColumnType.DATE: tables.DateColumn,
             Column.ColumnType.EMAIL: tables.EmailColumn,
             Column.ColumnType.URL: tables.URLColumn,
+            Column.ColumnType.FILE: tables.FileColumn,
             # Для INTEGER FLOAT и TEXT используем обычный Column
         }
 
@@ -137,6 +138,7 @@ class DynamicTable(tables.Table):
             Column.ColumnType.DATE: tables.DateColumn,
             Column.ColumnType.EMAIL: tables.EmailColumn,
             Column.ColumnType.URL: tables.URLColumn,
+            Column.ColumnType.FILE: tables.FileColumn,
             # Для INTEGER FLOAT и TEXT используем обычный Column
         }
 

@@ -1,11 +1,14 @@
 import datetime
+import os
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import F, Value, TextField, Subquery, OuterRef, Q
+from django.db.models.fields.files import FieldFile
 from django.db.models.functions import Concat
 from django.contrib.auth.models import User
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, FileResponse
 from django.urls import reverse
 from django.template.loader import render_to_string
 from django_tables2.export import TableExport
@@ -18,6 +21,7 @@ from django.contrib import messages
 from django_tables2 import RequestConfig
 from .tables import DynamicTable, ExportTable
 from django.views.decorators.http import require_POST
+from django.conf import settings
 
 
 def get_user_filials(request):
@@ -65,11 +69,38 @@ def save_row_data(row, form, columns):
         field_name = f'col_{column.id}'
         value = form.cleaned_data[field_name]
 
-        Cell.objects.update_or_create(
-            row=row,
-            column=column,
-            defaults={'value': value}
-        )
+        # Для файловых полей
+        if column.data_type == Column.ColumnType.FILE:
+            clear_flag = form.data.get(f'{field_name}-clear', False)
+            cell, created = Cell.objects.get_or_create(
+                row=row,
+                column=column,
+                defaults={'file_value': None}
+            )
+            # Если передано новое значение файла или передан флажок удаления файла
+            if clear_flag or (value and not isinstance(value, FieldFile)):
+                if cell.file_value:
+                    try:
+                        default_storage.delete(cell.file_value.name)
+                    except Exception as e:
+                        print(f"Ошибка удаления файла {cell.file_value.name}: {e}")
+
+                # Если загружен новый файл — сохраняем его
+            if value and not isinstance(value, FieldFile):
+                cell.file_value.save(value.name, value)
+                cell.save()
+                # Если стоит галочка удаления И НЕМ нового файла — очищаем поле
+            elif clear_flag:
+                cell.file_value = None
+                cell.save()
+
+        # Для не-файловых полей
+        else:
+            Cell.objects.update_or_create(
+                row=row,
+                column=column,
+                defaults={'value': value}
+            )
 
 
 @login_required
@@ -409,11 +440,10 @@ def edit_row(request, table_pk, row_pk):
     columns = table.columns.all()
 
     if request.method == 'POST':
-        form = RowEditForm(request.POST, row=row, columns=columns)
+        form = RowEditForm(request.POST, request.FILES, row=row, columns=columns)
         if form.is_valid():
             # Снимаем блокировку после успешного редактирования
             unlock_row(row, request.user)
-
             save_row_data(row, form, columns)
             messages.success(request, 'Строка успешно отредактирована!')
             return JsonResponse({'status': 'success'})
@@ -449,7 +479,7 @@ def add_row(request, pk):
     available_filials = get_available_filials_for_adding(request.user, table)
 
     if request.method == 'POST':
-        form = AddRowForm(request.POST, table=table, columns=columns, user=request.user,
+        form = AddRowForm(request.POST, request.FILES, table=table, columns=columns, user=request.user,
                           available_filials=available_filials)
         if form.is_valid():
             selected_filial = form.cleaned_data['filial']
@@ -617,6 +647,17 @@ def export_table(request, table_pk):
     return render(request, "tables/export/export_table.html", {
         "table": table
     })
+
+
+@login_required
+def download_file(request, name_file):
+    full_path = os.path.join(settings.MEDIA_ROOT + '/files', name_file)
+    if not os.path.exists(full_path):
+        return HttpResponseForbidden("Файл не найден")
+
+    response = FileResponse(open(full_path, 'rb'))
+    response['Content-Disposition'] = f'attachment; filename="{os.path.basename(name_file)}"'
+    return response
 
 
 def check_filial_rights(user, table):
