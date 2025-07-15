@@ -1,5 +1,5 @@
-import datetime
-
+from django.core.exceptions import ValidationError
+from django.core.validators import EmailValidator, URLValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.functions import Concat
@@ -178,9 +178,12 @@ class Column(models.Model):
     class ColumnType(models.TextChoices):
         TEXT = 'text', 'Текст'
         INTEGER = 'integer', 'Целое число'
+        POSITIVE_INTEGER = 'pos_integer', 'Целое число больше нуля'
         FLOAT = 'float', 'Число с плавающей точкой'
         BOOLEAN = 'boolean', 'Логическое'
         DATE = 'date', 'Дата'
+        EMAIL = 'email', 'Почта'
+        URL = 'url', 'Ссылка'
 
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='columns')
     name = models.CharField(max_length=100)
@@ -191,7 +194,7 @@ class Column(models.Model):
         help_text="Если отмечено, поле должно быть заполнено при создании/редактировании строки"
     )
     data_type = models.CharField(
-        max_length=10,
+        max_length=12,
         choices=ColumnType.choices,
         default=ColumnType.TEXT
     )
@@ -357,6 +360,30 @@ class Row(models.Model):
             return queryset.annotate(
                 **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=FloatField())}
             )
+        elif data_type == Column.ColumnType.POSITIVE_INTEGER:
+            subquery = Cell.objects.filter(
+                row=models.OuterRef('pk'),
+                column_id=column_id
+            ).values('positive_integer_value')[:1]
+            return queryset.annotate(
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=IntegerField())}
+            )
+        elif data_type == Column.ColumnType.EMAIL:
+            subquery = Cell.objects.filter(
+                row=models.OuterRef('pk'),
+                column_id=column_id
+            ).values('email_value')[:1]
+            return queryset.annotate(
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=TextField())}
+            )
+        elif data_type == Column.ColumnType.URL:
+            subquery = Cell.objects.filter(
+                row=models.OuterRef('pk'),
+                column_id=column_id
+            ).values('url_value')[:1]
+            return queryset.annotate(
+                **{f'sort_value_{column_id}': models.Subquery(subquery, output_field=TextField())}
+            )
         elif data_type == Column.ColumnType.BOOLEAN:
             subquery = Cell.objects.filter(
                 row=models.OuterRef('pk'),
@@ -400,6 +427,9 @@ class Cell(models.Model):
     # Поля для разных типов данных
     text_value = models.TextField(blank=True, null=True)
     integer_value = models.IntegerField(blank=True, null=True)
+    positive_integer_value = models.PositiveIntegerField(blank=True, null=True)
+    email_value = models.EmailField(blank=True, null=True)
+    url_value = models.URLField(blank=True, null=True)
     float_value = models.FloatField(blank=True, null=True)
     boolean_value = models.BooleanField(blank=True, null=True)
     date_value = models.DateField(blank=True, null=True)
@@ -412,6 +442,9 @@ class Cell(models.Model):
         """Возвращает значение по умолчанию для типа данных"""
         defaults = {
             Column.ColumnType.INTEGER: 0,
+            Column.ColumnType.POSITIVE_INTEGER: 1,
+            Column.ColumnType.EMAIL: 'example@mail.ru',
+            Column.ColumnType.URL: 'http://example.ru',
             Column.ColumnType.FLOAT: 0.0,
             Column.ColumnType.BOOLEAN: False,
             Column.ColumnType.DATE: date.today(),
@@ -424,6 +457,12 @@ class Cell(models.Model):
         """Возвращает значение в зависимости от типа колонки"""
         if self.column.data_type == Column.ColumnType.INTEGER:
             return self.integer_value
+        elif self.column.data_type == Column.ColumnType.POSITIVE_INTEGER:
+            return self.positive_integer_value
+        elif self.column.data_type == Column.ColumnType.EMAIL:
+            return self.email_value
+        elif self.column.data_type == Column.ColumnType.URL:
+            return self.url_value
         elif self.column.data_type == Column.ColumnType.FLOAT:
             return self.float_value
         elif self.column.data_type == Column.ColumnType.BOOLEAN:
@@ -438,6 +477,28 @@ class Cell(models.Model):
         """Устанавливает значение в правильное поле"""
         if self.column.data_type == Column.ColumnType.INTEGER:
             self.integer_value = int(val) if val is not None else None
+        elif self.column.data_type == Column.ColumnType.POSITIVE_INTEGER:
+            self.positive_integer_value = int(val) if val is not None else None
+        elif self.column.data_type == Column.ColumnType.EMAIL:
+            if val is not None:
+                validator = EmailValidator()
+                try:
+                    validator(val)
+                    self.email_value = val
+                except ValidationError:
+                    self.email_value = None
+            else:
+                self.email_value = None
+        elif self.column.data_type == Column.ColumnType.URL:
+            if val is not None:
+                validator = URLValidator()
+                try:
+                    validator(val)
+                    self.url_value = val
+                except ValidationError:
+                    self.url_value = None
+            else:
+                self.url_value = None
         elif self.column.data_type == Column.ColumnType.FLOAT:
             self.float_value = float(val) if val is not None else None
         elif self.column.data_type == Column.ColumnType.BOOLEAN:

@@ -417,7 +417,8 @@ def edit_row(request, table_pk, row_pk):
             save_row_data(row, form, columns)
             messages.success(request, 'Строка успешно отредактирована!')
             return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+        errors = [error_list[0] for field, error_list in form.errors.items()]
+        return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
 
     lock, lock_user = lock_row(row, request.user)
     if not lock:
@@ -473,7 +474,8 @@ def add_row(request, pk):
 
             messages.success(request, 'Новая строка успешно добавлена')
             return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+        errors = [error_list[0] for field, error_list in form.errors.items()]
+        return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
 
     # GET запрос - возвращаем форму
     form = AddRowForm(table=table, user=request.user, columns=columns, available_filials=available_filials)

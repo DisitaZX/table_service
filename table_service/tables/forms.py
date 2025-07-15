@@ -229,6 +229,39 @@ class AddRowForm(forms.Form):
                             'placeholder': 'Введите целое число'
                         }),
                     )
+                elif column.data_type == Column.ColumnType.POSITIVE_INTEGER:
+                    self.fields[field_name] = forms.IntegerField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.NumberInput(attrs={
+                            'class': 'form-control',
+                            'step': '1',
+                            'min': '0',
+                            'max': '2147483647',
+                            'placeholder': 'Введите целое число больше 0'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.EMAIL:
+                    self.fields[field_name] = forms.EmailField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.EmailInput(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Введите Email'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.URL:
+                    self.fields[field_name] = forms.URLField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.URLInput(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Введите ссылку'
+                        }),
+                    )
                 elif column.data_type == Column.ColumnType.FLOAT:
                     self.fields[field_name] = forms.FloatField(
                         label=column.name,
@@ -298,6 +331,39 @@ class RowEditForm(forms.Form):
                             'min': '-2147483648',
                             'max': '2147483647',
                             'placeholder': 'Введите целое число'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.POSITIVE_INTEGER:
+                    self.fields[field_name] = forms.IntegerField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.NumberInput(attrs={
+                            'class': 'form-control',
+                            'step': '1',
+                            'min': '0',
+                            'max': '2147483647',
+                            'placeholder': 'Введите целое число больше 0'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.EMAIL:
+                    self.fields[field_name] = forms.EmailField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.EmailInput(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Введите Email'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.URL:
+                    self.fields[field_name] = forms.URLField(
+                        label=column.name,
+                        required=required,
+                        initial=initial_value,
+                        widget=forms.URLInput(attrs={
+                            'class': 'form-control',
+                            'placeholder': 'Введите ссылку'
                         }),
                     )
                 elif column.data_type == Column.ColumnType.FLOAT:

@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.reload(); // Обновляем таблицу
             } else {
                 alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
-                }
+            }
         })
         .catch(error => {
             console.error('Error:', error);

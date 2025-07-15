@@ -49,42 +49,24 @@ class ExportTable(tables.Table):
         col_name = f'col_{column.id}'
         accessor = f'cell_values.{column.id}'
 
-        # Выбираем соответствующий тип столбца
-        if column.data_type == Column.ColumnType.INTEGER:
-            self.base_columns[col_name] = tables.Column(
-                verbose_name=column.name,
-                accessor=accessor,
-                attrs={'td': {'class': 'text-center'}},
-                orderable=False,
-            )
-        if column.data_type == Column.ColumnType.FLOAT:
-            self.base_columns[col_name] = tables.Column(
-                verbose_name=column.name,
-                accessor=accessor,
-                attrs={'td': {'class': 'text-center'}},
-                orderable=False,
-            )
-        elif column.data_type == Column.ColumnType.BOOLEAN:
-            self.base_columns[col_name] = tables.BooleanColumn(
-                verbose_name=column.name,
-                accessor=accessor,
-                attrs={'td': {'class': 'text-center'}},
-                orderable=False,
-            )
-        elif column.data_type == Column.ColumnType.DATE:
-            self.base_columns[col_name] = tables.DateColumn(
-                verbose_name=column.name,
-                accessor=accessor,
-                attrs={'td': {'class': 'text-center'}},
-                orderable=False,
-            )
-        else:  # TEXT по умолчанию
-            self.base_columns[col_name] = tables.Column(
-                verbose_name=column.name,
-                accessor=accessor,
-                attrs={'td': {'class': 'text-center'}},
-                orderable=False,
-            )
+        column_kwargs = {
+            'verbose_name': column.name,
+            'accessor': accessor,
+            'attrs': {'td': {'class': 'text-center'}},
+            'order_by': f'sort_value_{column.id}'
+        }
+
+        # Выбор типа колонки
+        column_types = {
+            Column.ColumnType.BOOLEAN: tables.BooleanColumn,
+            Column.ColumnType.DATE: tables.DateColumn,
+            Column.ColumnType.EMAIL: tables.EmailColumn,
+            Column.ColumnType.URL: tables.URLColumn,
+            # Для INTEGER FLOAT и TEXT используем обычный Column
+        }
+
+        column_class = column_types.get(column.data_type, tables.Column)
+        self.base_columns[col_name] = column_class(**column_kwargs)
 
 
 class DynamicTable(tables.Table):
@@ -153,6 +135,8 @@ class DynamicTable(tables.Table):
         column_types = {
             Column.ColumnType.BOOLEAN: tables.BooleanColumn,
             Column.ColumnType.DATE: tables.DateColumn,
+            Column.ColumnType.EMAIL: tables.EmailColumn,
+            Column.ColumnType.URL: tables.URLColumn,
             # Для INTEGER FLOAT и TEXT используем обычный Column
         }
 
