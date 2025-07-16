@@ -20,23 +20,42 @@ class TableForm(forms.ModelForm):
 class ColumnForm(forms.ModelForm):
     class Meta:
         model = Column
-        fields = ['name', 'data_type', 'is_required']
+        fields = ['name', 'data_type', 'is_required', 'choices']
         widgets = {
             'data_type': forms.Select(choices=Column.ColumnType.choices),
             'is_required': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             })
         }
-
+    choice_options = forms.CharField(
+        required=False,
+        label="Варианты выбора:",
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Вариант 1; Вариант 2; Вариант 3'
+        }),
+        help_text='Введите варианты через точку с запятой (;)'
+    )
     labels = {
         'is_required': 'Обязательное поле'
     }
+
+    def __init__(self, *args, **kwargs):
+        self.table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        choice_options = cleaned_data.get('choice_options')
+        if choice_options:
+            # Разделяем строку по ";" и убираем пустые значения
+            choices = [opt.strip() for opt in choice_options.split(";") if opt.strip()]
+            cleaned_data["choices"] = choices
 
 
 class ColumnEditForm(forms.ModelForm):
     class Meta:
         model = Column
-        fields = ['name', 'order', 'data_type', 'is_required']
+        fields = ['name', 'order', 'data_type', 'is_required', 'choices']
         widgets = {
             'order': forms.NumberInput(attrs={'min': 0}),
             'data_type': forms.Select(choices=Column.ColumnType.choices),
@@ -48,10 +67,21 @@ class ColumnEditForm(forms.ModelForm):
     labels = {
         'is_required': 'Обязательное поле'
     }
+    choice_options = forms.CharField(
+        required=False,
+        label="Варианты выбора:",
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Вариант 1; Вариант 2; Вариант 3'
+        }),
+        help_text='Введите варианты через точку с запятой (;)'
+    )
 
     def __init__(self, *args, **kwargs):
         self.table = kwargs.pop('table', None)
         super().__init__(*args, **kwargs)
+
+        if self.instance.choices:
+            self.initial['choice_options'] = ";".join(self.instance.choices)
 
     def clean_order(self):
         order = self.cleaned_data['order']
@@ -67,6 +97,14 @@ class ColumnEditForm(forms.ModelForm):
                 col.save()
 
         return order
+
+    def clean(self):
+        cleaned_data = super().clean()
+        choice_options = cleaned_data.get('choice_options')
+        if choice_options:
+            # Разделяем строку по ";" и убираем пустые значения
+            choices = [opt.strip() for opt in choice_options.split(";") if opt.strip()]
+            cleaned_data["choices"] = choices
 
 
 class TablePermissionForm(forms.ModelForm):
@@ -242,6 +280,18 @@ class AddRowForm(forms.Form):
                             'placeholder': 'Введите целое число больше 0'
                         }),
                     )
+                elif column.data_type == Column.ColumnType.CHOICE:
+                    choices_list = column.choices if column.choices else []
+                    choices = [(item, item) for item in choices_list]
+                    self.fields[field_name] = forms.ChoiceField(
+                        label=column.name,
+                        required=required,
+                        choices=choices,
+                        initial=initial_value,
+                        widget=forms.Select(attrs={
+                            'class': 'form-control',
+                        }),
+                    )
                 elif column.data_type == Column.ColumnType.EMAIL:
                     self.fields[field_name] = forms.EmailField(
                         label=column.name,
@@ -364,6 +414,18 @@ class RowEditForm(forms.Form):
                         widget=forms.EmailInput(attrs={
                             'class': 'form-control',
                             'placeholder': 'Введите Email'
+                        }),
+                    )
+                elif column.data_type == Column.ColumnType.CHOICE:
+                    choices_list = column.choices if column.choices else []
+                    choices = [(item, item) for item in choices_list]
+                    self.fields[field_name] = forms.ChoiceField(
+                        label=column.name,
+                        required=required,
+                        choices=choices,
+                        initial=initial_value,
+                        widget=forms.Select(attrs={
+                            'class': 'form-control',
                         }),
                     )
                 elif column.data_type == Column.ColumnType.URL:

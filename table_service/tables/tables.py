@@ -139,6 +139,7 @@ class DynamicTable(tables.Table):
             Column.ColumnType.EMAIL: tables.EmailColumn,
             Column.ColumnType.URL: tables.URLColumn,
             Column.ColumnType.FILE: tables.FileColumn,
+            Column.ColumnType.CHOICE: tables.Column
             # Для INTEGER FLOAT и TEXT используем обычный Column
         }
 

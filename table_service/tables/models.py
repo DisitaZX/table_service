@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile, InMemoryUploadedFile
 from django.core.validators import EmailValidator, URLValidator
@@ -186,6 +187,7 @@ class Column(models.Model):
         EMAIL = 'email', 'Почта'
         URL = 'url', 'Ссылка'
         FILE = 'file', 'Файл'
+        CHOICE = 'choice', 'Выбор из списка'
 
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='columns')
     name = models.CharField(max_length=100)
@@ -200,6 +202,7 @@ class Column(models.Model):
         choices=ColumnType.choices,
         default=ColumnType.TEXT
     )
+    choices = ArrayField(models.CharField(max_length=100), blank=True, null=True, default=list)
 
     class Meta:
         ordering = ['order']
@@ -444,6 +447,7 @@ class Cell(models.Model):
     float_value = models.FloatField(blank=True, null=True)
     boolean_value = models.BooleanField(blank=True, null=True)
     date_value = models.DateField(blank=True, null=True)
+    choice_value = models.TextField(max_length=255, blank=True, null=True)
 
     class Meta:
         unique_together = ('row', 'column')
@@ -460,7 +464,8 @@ class Cell(models.Model):
             Column.ColumnType.FLOAT: 0.0,
             Column.ColumnType.BOOLEAN: False,
             Column.ColumnType.DATE: date.today(),
-            Column.ColumnType.TEXT: ''
+            Column.ColumnType.TEXT: '',
+            Column.ColumnType.CHOICE: ''
         }
         return defaults.get(data_type, '')
 
@@ -483,6 +488,8 @@ class Cell(models.Model):
             return self.boolean_value
         elif self.column.data_type == Column.ColumnType.DATE:
             return self.date_value
+        elif self.column.data_type == Column.ColumnType.CHOICE:
+            return self.choice_value
         else:  # TEXT
             return self.text_value
 
@@ -529,6 +536,8 @@ class Cell(models.Model):
             self.float_value = float(val) if val is not None else None
         elif self.column.data_type == Column.ColumnType.BOOLEAN:
             self.boolean_value = bool(val) if val is not None else None
+        elif self.column.data_type == Column.ColumnType.CHOICE:
+            self.choice_value = val if val is not None else None
         elif self.column.data_type == Column.ColumnType.DATE:
             self.date_value = val if val is not None else None  # Здесь val уже datetime.date
         else:  # TEXT

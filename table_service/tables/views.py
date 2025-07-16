@@ -151,7 +151,7 @@ def add_column(request, pk):
         return HttpResponseForbidden("Вы не можете добавлять колонки в эту таблицу")
 
     if request.method == 'POST':
-        form = ColumnForm(request.POST)
+        form = ColumnForm(request.POST, table=table)
         if form.is_valid():
             with transaction.atomic():
                 column = form.save(commit=False)
@@ -162,7 +162,7 @@ def add_column(request, pk):
                 messages.success(request, f'Колонка "{column.name}" успешно добавлена')
                 return redirect('table_detail', pk=table.pk)
     else:
-        form = ColumnForm()
+        form = ColumnForm(table=table)
     return render(request, 'tables/add_column/add_column.html', {'form': form, 'table': table})
 
 

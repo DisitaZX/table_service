@@ -44,7 +44,15 @@
                                 {{ form.data_type.errors|join:", " }}
                             </div>
                         {% endif %}
-
+                        <div id="choice_options_div" style="display: none;">
+                            <label class="form-label mt-3">
+                                {{ form.choice_options.label }}
+                            </label>
+                            {{ form.choice_options }}
+                            <small class="form-text text-muted">
+                                {{ form.choice_options.help_text }}
+                            </small>
+                        </div>
                         <div class="form-check mt-3">
                             {{ form.is_required }}
                             <div class="d-flex flex-column">
@@ -87,6 +95,24 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('id_order').classList.add('form-control');
     document.getElementById('id_data_type').classList.add('form-select');
     document.getElementById('id_is_required').classList.add('form-check-input');
+    document.getElementById('id_choice_options').classList.add('form-control');
+
+    const dataTypeSelect = document.querySelector('#id_data_type');
+    const choiceOptionsDiv = document.querySelector('#choice_options_div');
+
+    function toggleChoiceOptions() {
+        if (dataTypeSelect.value === 'choice') {
+            choiceOptionsDiv.style.display = 'block';
+        } else {
+            choiceOptionsDiv.style.display = 'none';
+        }
+    }
+
+    // Инициализация
+    toggleChoiceOptions();
+
+    // Обработчик изменения
+    dataTypeSelect.addEventListener('change', toggleChoiceOptions);
 });
 </script>
 {% endblock %}
