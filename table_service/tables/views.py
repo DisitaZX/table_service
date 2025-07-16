@@ -873,11 +873,20 @@ def filter_func(queryset, columns, request):
                     )
                 except ValueError:
                     pass
-        elif filter_value:
-            # Фильтр для текстовых значений (TEXT, EMAIL, URL)
+        elif column.data_type == Column.ColumnType.TEXT and filter_value:
             queryset = queryset.filter(
                 cells__column=column,
                 cells__text_value__icontains=filter_value
+            )
+        elif column.data_type == Column.ColumnType.URL and filter_value:
+            queryset = queryset.filter(
+                cells__column=column,
+                cells__url_value__icontains=filter_value
+            )
+        elif column.data_type == Column.ColumnType.EMAIL and filter_value:
+            queryset = queryset.filter(
+                cells__column=column,
+                cells__email_value__icontains=filter_value
             )
 
     return queryset, search_query
