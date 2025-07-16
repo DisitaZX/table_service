@@ -36,9 +36,6 @@
 }
 
 #clickable-btns {
-    width: 79%;
-    height: auto;
-    display: flex;
     flex-wrap: wrap;
     margin-bottom: 10px;
 }

@@ -30,13 +30,13 @@
             Экспорт таблицы
         </a>
     </div>
-    <div>
+    <div id="clickable-btns">
         <a href="{% url 'delete_table' table_obj.pk %}" class="btn btn-danger"
            onclick="return confirm('Удалить таблицу?')">
             <i class="fas fa-ban"></i> Удалить таблицу
         </a>
         {% if filials %}
-            <div class="dropdown mt-2">
+            <div class="dropdown">
                 <!-- Основная кнопка -->
                 <a href="#" class="btn btn-danger dropdown-toggle"
                    id="revokeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
