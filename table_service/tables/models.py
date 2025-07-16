@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile, InMemoryUploadedFile
@@ -222,6 +224,15 @@ class Row(models.Model):
         blank=True,
         related_name='created_rows'
     )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_rows'
+    )
+    last_date = models.DateTimeField(null=True,
+                                     blank=True)
 
     class Meta:
         ordering = ['order']

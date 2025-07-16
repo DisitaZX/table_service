@@ -445,6 +445,9 @@ def edit_row(request, table_pk, row_pk):
             # Снимаем блокировку после успешного редактирования
             unlock_row(row, request.user)
             save_row_data(row, form, columns)
+            row.updated_by = request.user
+            row.last_date = datetime.datetime.now()
+            row.save()
             messages.success(request, 'Строка успешно отредактирована!')
             return JsonResponse({'status': 'success'})
         errors = [error_list[0] for field, error_list in form.errors.items()]
@@ -488,7 +491,9 @@ def add_row(request, pk):
                 table=table,
                 order=table.rows.count(),  # Порядковый номер новой строки
                 filial=selected_filial,
-                created_by=request.user
+                created_by=request.user,
+                updated_by=request.user,
+                last_date=datetime.datetime.now()
             )
 
             # Заполняем ячейки данными из формы

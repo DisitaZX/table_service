@@ -43,6 +43,24 @@ class ExportTable(tables.Table):
                 orderable=False,
             )
 
+            self.base_columns['update_user'] = tables.Column(
+                verbose_name='Обновлено',
+                accessor=f'updated_by__profile__employee',
+                attrs={
+                    'td': {'class': 'text-center'}
+                },
+                orderable=False,
+            )
+
+            self.base_columns['update_date'] = tables.Column(
+                verbose_name='Обновлено',
+                accessor=f'last_date',
+                attrs={
+                    'td': {'class': 'text-center'}
+                },
+                orderable=False,
+            )
+
         super().__init__(*args, **kwargs)
 
     def _add_column(self, column):
@@ -81,7 +99,10 @@ class DynamicTable(tables.Table):
             'class': 'table table-bordered table-hover',
             'thead': {
                 'class': 'table-light'
-            }
+            },
+            'th': {
+                'style': 'white-space: nowrap;',  # Запрет переноса
+            },
         }
         fields = ()  # Будем заполнять динамически
 
@@ -94,7 +115,7 @@ class DynamicTable(tables.Table):
                 self._add_column(column)
 
             self.base_columns['filial'] = tables.Column(
-                verbose_name=self.get_column_header(None, is_filial=True),
+                verbose_name=self.get_column_header(is_filial=True),
                 accessor='filial.name',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -103,20 +124,41 @@ class DynamicTable(tables.Table):
             )
 
             self.base_columns['user'] = tables.Column(
-                verbose_name=self.get_column_header(None, is_user=True),
+                verbose_name=self.get_column_header(is_user=True),
                 accessor=f'created_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
                 order_by='created_by__profile__employee__secondname'
             )
+
+            self.base_columns['update_user'] = tables.Column(
+                verbose_name=self.get_column_header(is_update_user=True),
+                accessor=f'updated_by__profile__employee',
+                attrs={
+                    'td': {'class': 'text-center'}
+                },
+                orderable=False,
+            )
+
+            self.base_columns['update_date'] = tables.Column(
+                verbose_name=self.get_column_header(is_update_time=True),
+                accessor=f'last_date',
+                attrs={
+                    'td': {'class': 'text-center'}
+                },
+                orderable=False,
+            )
+
             self.base_columns['actions'] = tables.Column(
                 empty_values=(),
                 orderable=False,
                 verbose_name='',
                 attrs={
-                    'td': {'class': 'text-center',
-                           'width': '125px'}
+                    'td': {
+                        'class': 'text-center',
+                        'style': 'white-space: nowrap;',  # Фиксация ширины и содержимого
+                    },
                 }
             )
         super().__init__(*args, **kwargs)
@@ -363,7 +405,7 @@ class DynamicTable(tables.Table):
 
         return params.urlencode()
 
-    def get_column_header(self, column=None, is_user=False, is_filial=False):
+    def get_column_header(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
         """Возвращает HTML для заголовка колонки с кнопками редактирования и фильтрацией"""
         edit = format_html('')
 
@@ -406,8 +448,13 @@ class DynamicTable(tables.Table):
             edit += format_html('<div class="d-flex mr-auto p-2">Пользователь</div>')
         elif is_filial:
             edit += format_html('<div class="d-flex mr-auto p-2">Филиал</div>')
+        elif is_update_user:
+            edit += format_html('<div class="d-flex mr-auto p-2">Обновивший пользователь</div>')
+        elif is_update_time:
+            edit += format_html('<div class="d-flex mr-auto p-2">Дата обновления</div>')
 
-        sort_icon = self.render_sort_icon(column, is_user=is_user, is_filial=is_filial)
+        sort_icon = self.render_sort_icon(column, is_user=is_user, is_filial=is_filial, is_update_user=is_update_user,
+                                          is_update_time=is_update_time)
         filter_icon = self.render_column_header(column) if column else ''
 
         return format_html(
@@ -417,7 +464,7 @@ class DynamicTable(tables.Table):
             filter_icon
         )
 
-    def _get_sort_params(self, column=None, is_user=False, is_filial=False):
+    def _get_sort_params(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
         if column:  # Для обычных колонок таблицы
             return {
                 'sort_field': f'col_{column.id}',
@@ -436,9 +483,21 @@ class DynamicTable(tables.Table):
                 'asc_sort': 'filial',
                 'desc_sort': '-filial'
             }
+        elif is_update_user:
+            return {
+                'sort_field': 'update_user',
+                'asc_sort': 'update_user',
+                'desc_sort': '-update_user'
+            }
+        elif is_update_time:
+            return {
+                'sort_field': 'update_time',
+                'asc_sort': 'update_time',
+                'desc_sort': '-update_time'
+            }
         return None
 
-    def render_sort_icon(self, column=None, is_user=False, is_filial=False):
+    def render_sort_icon(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
         sort_params = None
 
         if column:
@@ -447,6 +506,10 @@ class DynamicTable(tables.Table):
             sort_params = self._get_sort_params(is_user=is_user)  # Для колонки user
         elif is_filial:
             sort_params = self._get_sort_params(is_filial=is_filial)  # Для колонки filial
+        elif is_update_user:
+            sort_params = self._get_sort_params(is_update_user=is_update_user)  # Для колонки filial
+        elif is_update_time:
+            sort_params = self._get_sort_params(is_update_time=is_update_time)  # Для колонки filial
 
         if not sort_params:
             return ''
