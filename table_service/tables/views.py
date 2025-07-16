@@ -732,6 +732,8 @@ def filter_func(queryset, columns, request):
         column_conditions = Q()
         for column in columns:
             column_conditions |= Q(cells__column=column, cells__text_value__icontains=search_query)
+            column_conditions |= Q(cells__column=column, cells__url_value__icontains=search_query)
+            column_conditions |= Q(cells__column=column, cells__email_value__icontains=search_query)
             if column.data_type == Column.ColumnType.INTEGER:
                 try:
                     int_value = int(search_query)
@@ -788,8 +790,97 @@ def filter_func(queryset, columns, request):
         ).distinct()
 
         return queryset, search_query
-    else:
-        return queryset, search_query
+
+    # Фильтрация по колонкам
+    for column in columns:
+        filter_value = request.GET.get(f'filter_{column.id}')
+
+        if column.data_type == Column.ColumnType.CHOICE and column.choices and filter_value:
+            # Фильтр для выбора из списка
+            queryset = queryset.filter(
+                cells__column=column,
+                cells__choice_value=filter_value
+            )
+        elif column.data_type == Column.ColumnType.BOOLEAN and filter_value:
+            # Фильтр для булевых значений
+            bool_value = filter_value.lower() == 'true'
+            queryset = queryset.filter(
+                cells__column=column,
+                cells__boolean_value=bool_value
+            )
+        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.POSITIVE_INTEGER]:
+            # Фильтр для целых чисел
+            min_value = request.GET.get(f'filter_{column.id}_min')
+            max_value = request.GET.get(f'filter_{column.id}_max')
+
+            if min_value:
+                try:
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__integer_value__gte=int(min_value)
+                    )
+                except ValueError:
+                    pass
+            if max_value:
+                try:
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__integer_value__lte=int(max_value)
+                    )
+                except ValueError:
+                    pass
+        elif column.data_type == Column.ColumnType.FLOAT:
+            # Фильтр для чисел с плавающей точкой
+            min_value = request.GET.get(f'filter_{column.id}_min')
+            max_value = request.GET.get(f'filter_{column.id}_max')
+
+            if min_value:
+                try:
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__float_value__gte=float(min_value)
+                    )
+                except ValueError:
+                    pass
+            if max_value:
+                try:
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__float_value__lte=float(max_value)
+                    )
+                except ValueError:
+                    pass
+        elif column.data_type == Column.ColumnType.DATE:
+            # Фильтр для дат
+            start_date = request.GET.get(f'filter_{column.id}_start')
+            end_date = request.GET.get(f'filter_{column.id}_end')
+
+            if start_date:
+                try:
+                    start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__date_value__gte=start_date
+                    )
+                except ValueError:
+                    pass
+            if end_date:
+                try:
+                    end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(
+                        cells__column=column,
+                        cells__date_value__lte=end_date
+                    )
+                except ValueError:
+                    pass
+        elif filter_value:
+            # Фильтр для текстовых значений (TEXT, EMAIL, URL)
+            queryset = queryset.filter(
+                cells__column=column,
+                cells__text_value__icontains=filter_value
+            )
+
+    return queryset, search_query
 
 
 def sort_func(queryset, columns):

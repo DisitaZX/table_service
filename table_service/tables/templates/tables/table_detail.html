@@ -112,5 +112,24 @@
 
 
 {% block extra_js %}
-<script src="{% static 'js/row_edit_modal.js' %}"></script>
+<script src="{% static 'js/row_edit_modal.js' %}"></script><script>
+// Обработка форм фильтрации без перезагрузки страницы
+document.querySelectorAll('.filter-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const params = new URLSearchParams(formData);
+
+        // Сохраняем существующие параметры
+        const currentParams = new URLSearchParams(window.location.search);
+        currentParams.forEach((value, key) => {
+            if (!params.has(key)) {
+                params.append(key, value);
+            }
+        });
+
+        window.location.search = params.toString();
+    });
+});
+</script>
 {% endblock %}

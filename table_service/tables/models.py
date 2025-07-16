@@ -202,7 +202,7 @@ class Column(models.Model):
         choices=ColumnType.choices,
         default=ColumnType.TEXT
     )
-    choices = ArrayField(models.CharField(max_length=100), blank=True, null=True, default=list)
+    choices = ArrayField(models.CharField(max_length=100), blank=True, null=True)
 
     class Meta:
         ordering = ['order']

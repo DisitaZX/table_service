@@ -167,8 +167,206 @@ class DynamicTable(tables.Table):
             )
         return edit
 
+    def render_column_header(self, column):
+        """Рендерит заголовок колонки с фильтром для всех типов данных"""
+        if not column:
+            return ""
+
+        filter_html = ""
+        current_filter = self.request.GET.get(f'filter_{column.id}', '')
+
+        if column.data_type == Column.ColumnType.CHOICE and column.choices:
+            # Фильтр для колонок с выбором из списка
+            filter_html = self._render_choice_filter(column, current_filter)
+        elif column.data_type == Column.ColumnType.BOOLEAN:
+            # Фильтр для булевых значений
+            filter_html = self._render_boolean_filter(column, current_filter)
+        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.FLOAT,
+                                  Column.ColumnType.POSITIVE_INTEGER]:
+            # Фильтр для числовых значений
+            filter_html = self._render_number_filter(column, current_filter)
+        elif column.data_type == Column.ColumnType.DATE:
+            # Фильтр для дат
+            filter_html = self._render_date_filter(column, current_filter)
+        elif column.data_type in [Column.ColumnType.URL, Column.ColumnType.EMAIL,
+                                  Column.ColumnType.TEXT]:
+            # Фильтр для текстовых значений (TEXT, EMAIL, URL)
+            filter_html = self._render_text_filter(column, current_filter)
+
+        return format_html(filter_html)
+
+    def _render_choice_filter(self, column, current_filter):
+        """Рендерит фильтр для колонок с выбором из списка"""
+        return f"""
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton_{column.id}">
+                <li><a class="dropdown-item {'active' if not current_filter else ''}" 
+                       href="?{self._get_filter_query(column.id, '')}">Все</a></li>
+                {"".join([
+            f'<li><a class="dropdown-item {"active" if current_filter == choice else ""}" '
+            f'href="?{self._get_filter_query(column.id, choice)}">{choice}</a></li>'
+            for choice in column.choices
+        ])}
+            </ul>
+        </div>
+        """
+
+    def _render_boolean_filter(self, column, current_filter):
+        """Рендерит фильтр для булевых значений"""
+        return f"""
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton_{column.id}">
+                <li><a class="dropdown-item {'active' if not current_filter else ''}" 
+                       href="?{self._get_filter_query(column.id, '')}">Все</a></li>
+                <li><a class="dropdown-item {'active' if current_filter == 'true' else ''}" 
+                       href="?{self._get_filter_query(column.id, 'true')}">Да</a></li>
+                <li><a class="dropdown-item {'active' if current_filter == 'false' else ''}" 
+                       href="?{self._get_filter_query(column.id, 'false')}">Нет</a></li>
+            </ul>
+        </div>
+        """
+
+    def _render_number_filter(self, column, current_filter):
+        """Рендерит фильтр для числовых значений"""
+        min_value = self.request.GET.get(f'filter_{column.id}_min', '')
+        max_value = self.request.GET.get(f'filter_{column.id}_max', '')
+
+        return f"""
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
+                <form method="get" action="?" class="filter-form">
+                    <input type="hidden" name="filter_column" value="{column.id}">
+                    <div class="mb-2">
+                        <label class="form-label">От</label>
+                        <input type="number" name="filter_{column.id}_min" 
+                               value="{min_value}" 
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">До</label>
+                        <input type="number" name="filter_{column.id}_max" 
+                               value="{max_value}" 
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+                        <a href="?{self._get_filter_query(column.id, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        """
+
+    def _render_date_filter(self, column, current_filter):
+        """Рендерит фильтр для дат"""
+        start_date = self.request.GET.get(f'filter_{column.id}_start', '')
+        end_date = self.request.GET.get(f'filter_{column.id}_end', '')
+
+        return f"""
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
+                <form method="get" action="?" class="filter-form">
+                    <input type="hidden" name="filter_column" value="{column.id}">
+                    <div class="mb-2">
+                        <label class="form-label">От</label>
+                        <input type="date" name="filter_{column.id}_start" 
+                               value="{start_date}" 
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">До</label>
+                        <input type="date" name="filter_{column.id}_end" 
+                               value="{end_date}" 
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+                        <a href="?{self._get_filter_query(column.id, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        """
+
+    def _render_text_filter(self, column, current_filter):
+        """Рендерит фильтр для текстовых значений"""
+        return f"""
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
+                <form method="get" action="?" class="filter-form">
+                    <input type="hidden" name="filter_column" value="{column.id}">
+                    <div class="mb-2">
+                        <input type="text" name="filter_{column.id}" 
+                               value="{current_filter}" 
+                               placeholder="Фильтр..."
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+                        <a href="?{self._get_filter_query(column.id, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        """
+
+    def _get_filter_query(self, column_id, value):
+        """Генерирует GET-запрос с фильтром для колонки, сохраняя другие фильтры"""
+        params = self.request.GET.copy()
+
+        # Удаляем все параметры фильтрации для текущей колонки
+        keys_to_remove = [
+            f'filter_{column_id}',
+            f'filter_{column_id}_min',
+            f'filter_{column_id}_max',
+            f'filter_{column_id}_start',
+            f'filter_{column_id}_end'
+        ]
+
+        for key in keys_to_remove:
+            if key in params:
+                del params[key]
+
+        # Если передано значение (не сброс фильтра), добавляем соответствующие параметры
+        if value:
+            if isinstance(value, dict):  # Для сложных фильтров (диапазоны)
+                for k, v in value.items():
+                    if v:  # Добавляем только непустые значения
+                        params[f'filter_{column_id}_{k}'] = v
+            else:  # Для простых фильтров (одиночное значение)
+                params[f'filter_{column_id}'] = value
+
+        return params.urlencode()
+
     def get_column_header(self, column=None, is_user=False, is_filial=False):
+        """Возвращает HTML для заголовка колонки с кнопками редактирования и фильтрацией"""
         edit = format_html('')
+
         if column and self.table_obj.owner == self.request.user:
             delete_url = reverse('delete_column',
                                  kwargs={
@@ -210,7 +408,14 @@ class DynamicTable(tables.Table):
             edit += format_html('<div class="d-flex mr-auto p-2">Филиал</div>')
 
         sort_icon = self.render_sort_icon(column, is_user=is_user, is_filial=is_filial)
-        return format_html('<div class="d-flex align-items-center">{} {}</div>', sort_icon, edit)
+        filter_icon = self.render_column_header(column) if column else ''
+
+        return format_html(
+            '<div class="d-flex align-items-center">{} {} {}</div>',
+            sort_icon,
+            edit,
+            filter_icon
+        )
 
     def _get_sort_params(self, column=None, is_user=False, is_filial=False):
         if column:  # Для обычных колонок таблицы
