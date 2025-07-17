@@ -852,7 +852,7 @@ def filter_func(queryset, columns, request):
                 cells__column=column,
                 cells__boolean_value=bool_value
             )
-        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.POSITIVE_INTEGER] and filter_value:
+        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.POSITIVE_INTEGER]:
             # Фильтр для целых чисел
             min_value = request.GET.get(f'filter_{column.id}_min')
             max_value = request.GET.get(f'filter_{column.id}_max')
@@ -873,7 +873,7 @@ def filter_func(queryset, columns, request):
                     )
                 except ValueError:
                     pass
-        elif column.data_type == Column.ColumnType.FLOAT and filter_value:
+        elif column.data_type == Column.ColumnType.FLOAT:
             # Фильтр для чисел с плавающей точкой
             min_value = request.GET.get(f'filter_{column.id}_min')
             max_value = request.GET.get(f'filter_{column.id}_max')
@@ -894,11 +894,12 @@ def filter_func(queryset, columns, request):
                     )
                 except ValueError:
                     pass
-        elif column.data_type == Column.ColumnType.DATE and filter_value:
+        elif column.data_type == Column.ColumnType.DATE:
             # Фильтр для дат
             start_date = request.GET.get(f'filter_{column.id}_start')
             end_date = request.GET.get(f'filter_{column.id}_end')
-
+            print(start_date)
+            print(end_date)
             if start_date:
                 try:
                     start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
