@@ -2,7 +2,7 @@
 {% load django_tables2 %}
 
 {% block content %}
-<div>
+<div class="mb-2">
   {% for format in table.export_formats %}
     <a href="{% export_url format %}" class="btn btn-primary">.{{ format }}</a>
   {% endfor %}

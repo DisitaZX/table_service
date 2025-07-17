@@ -71,7 +71,7 @@ class ExportTable(tables.Table):
             'verbose_name': column.name,
             'accessor': accessor,
             'attrs': {'td': {'class': 'text-center'}},
-            'order_by': f'sort_value_{column.id}'
+            'orderable': False
         }
 
         # Выбор типа колонки
