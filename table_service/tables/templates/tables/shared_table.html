@@ -46,7 +46,7 @@
         </div>
     {% endif %}
 </div>
-    <form method="get" class="mb-3">
+<form method="get" class="mb-3">
     <div class="input-group">
         <input type="text" name="q" class="form-control" placeholder="Поиск..."
                value="{{ request.GET.q }}">
@@ -58,6 +58,9 @@
         {% endif %}
     </div>
 </form>
+<a href="{{ table.get_reset_filters_url }}" class="btn btn-sm btn-outline-secondary mb-3">
+    <i class="bi bi-funnel"> Сбросить все фильтры</i>
+</a>
 {% render_table table %}
 <div class="modal fade" id="addRowModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">

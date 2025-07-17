@@ -115,7 +115,7 @@ class DynamicTable(tables.Table):
                 self._add_column(column)
 
             self.base_columns['filial'] = tables.Column(
-                verbose_name=self.get_column_header(is_filial=True),
+                verbose_name=self.get_column_header('is_filial'),
                 accessor='filial.name',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -124,7 +124,7 @@ class DynamicTable(tables.Table):
             )
 
             self.base_columns['user'] = tables.Column(
-                verbose_name=self.get_column_header(is_user=True),
+                verbose_name=self.get_column_header('is_user'),
                 accessor=f'created_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -133,7 +133,7 @@ class DynamicTable(tables.Table):
             )
 
             self.base_columns['update_user'] = tables.Column(
-                verbose_name=self.get_column_header(is_update_user=True),
+                verbose_name=self.get_column_header('is_update_user'),
                 accessor=f'updated_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -142,7 +142,7 @@ class DynamicTable(tables.Table):
             )
 
             self.base_columns['update_date'] = tables.Column(
-                verbose_name=self.get_column_header(is_update_time=True),
+                verbose_name=self.get_column_header('is_update_time'),
                 accessor=f'last_date',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -307,7 +307,7 @@ class DynamicTable(tables.Table):
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(column.id, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(column.id, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
@@ -316,34 +316,39 @@ class DynamicTable(tables.Table):
 
     def _render_date_filter(self, column, current_filter):
         """Рендерит фильтр для дат"""
-        start_date = self.request.GET.get(f'filter_{column.id}_start', '')
-        end_date = self.request.GET.get(f'filter_{column.id}_end', '')
+        if isinstance(column, Column):
+            field_name = column.id
+        else:
+            field_name = column
+
+        start_date = self.request.GET.get(f'filter_{field_name}_start', '')
+        end_date = self.request.GET.get(f'filter_{field_name}_end', '')
 
         return f"""
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
-                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    id="dropdownMenuButton_{field_name}" data-bs-toggle="dropdown" 
                     aria-expanded="false">
                 <i class="bi bi-funnel"></i>
             </button>
-            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
+            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{field_name}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
-                    <input type="hidden" name="filter_column" value="{column.id}">
+                    <input type="hidden" name="filter_column" value="{field_name}">
                     <div class="mb-2">
                         <label class="form-label">От</label>
-                        <input type="date" name="filter_{column.id}_start" 
+                        <input type="date" name="filter_{field_name}_start" 
                                value="{start_date}" 
                                class="form-control form-control-sm">
                     </div>
                     <div class="mb-2">
                         <label class="form-label">До</label>
-                        <input type="date" name="filter_{column.id}_end" 
+                        <input type="date" name="filter_{field_name}_end" 
                                value="{end_date}" 
                                class="form-control form-control-sm">
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(column.id, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(field_name, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
@@ -351,49 +356,50 @@ class DynamicTable(tables.Table):
         """
 
     def _render_text_filter(self, column, current_filter):
+        if isinstance(column, Column):
+            field_name = column.id
+        else:
+            field_name = column
+
         """Рендерит фильтр для текстовых значений"""
         return f"""
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
-                    id="dropdownMenuButton_{column.id}" data-bs-toggle="dropdown" 
+                    id="dropdownMenuButton_{field_name}" data-bs-toggle="dropdown" 
                     aria-expanded="false">
                 <i class="bi bi-funnel"></i>
             </button>
-            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
+            <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{field_name}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
-                    <input type="hidden" name="filter_column" value="{column.id}">
                     <div class="mb-2">
-                        <input type="text" name="filter_{column.id}" 
+                        <input type="text" name="filter_{field_name}" 
                                value="{current_filter}" 
                                placeholder="Фильтр..."
                                class="form-control form-control-sm">
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(column.id, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(field_name, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
         </div>
         """
 
+    def get_reset_filters_url(self):
+        """Возвращает URL для сброса ВСЕХ фильтров (оставляет сортировку и другие параметры)"""
+        params = self.request.GET.copy()
+
+        # Удаляем все параметры, начинающиеся с 'filter_'
+        filter_keys = [key for key in params.keys() if key.startswith('filter_')]
+        for key in filter_keys:
+            del params[key]
+
+        return f"?{params.urlencode()}" if params else "?"
+
     def _get_filter_query(self, column_id, value):
         """Генерирует GET-запрос с фильтром для колонки, сохраняя другие фильтры"""
         params = self.request.GET.copy()
-
-        # Удаляем все параметры фильтрации для текущей колонки
-        keys_to_remove = [
-            f'filter_{column_id}',
-            f'filter_{column_id}_min',
-            f'filter_{column_id}_max',
-            f'filter_{column_id}_start',
-            f'filter_{column_id}_end'
-        ]
-
-        for key in keys_to_remove:
-            if key in params:
-                del params[key]
-
         # Если передано значение (не сброс фильтра), добавляем соответствующие параметры
         if value:
             if isinstance(value, dict):  # Для сложных фильтров (диапазоны)
@@ -402,14 +408,26 @@ class DynamicTable(tables.Table):
                         params[f'filter_{column_id}_{k}'] = v
             else:  # Для простых фильтров (одиночное значение)
                 params[f'filter_{column_id}'] = value
+        else:
+            # Удаляем все параметры фильтрации для текущей колонки
+            keys_to_remove = [
+                f'filter_{column_id}',
+                f'filter_{column_id}_min',
+                f'filter_{column_id}_max',
+                f'filter_{column_id}_start',
+                f'filter_{column_id}_end'
+            ]
 
+            for key in keys_to_remove:
+                if key in params:
+                    del params[key]
         return params.urlencode()
 
-    def get_column_header(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
+    def get_column_header(self, column):
         """Возвращает HTML для заголовка колонки с кнопками редактирования и фильтрацией"""
         edit = format_html('')
 
-        if column and self.table_obj.owner == self.request.user:
+        if isinstance(column, Column) and self.table_obj.owner == self.request.user:
             delete_url = reverse('delete_column',
                                  kwargs={
                                      'table_pk': self.table_obj.pk,
@@ -442,20 +460,26 @@ class DynamicTable(tables.Table):
                 delete_url,
                 csrf_input(self.request)
             )
-        elif column:
+        elif isinstance(column, Column):
             edit += format_html('<div class="d-flex mr-auto p-2">{}</div>', column.name)
-        elif is_user:
+        elif column == 'is_user':
             edit += format_html('<div class="d-flex mr-auto p-2">Пользователь</div>')
-        elif is_filial:
+        elif column == 'is_filial':
             edit += format_html('<div class="d-flex mr-auto p-2">Филиал</div>')
-        elif is_update_user:
+        elif column == 'is_update_user':
             edit += format_html('<div class="d-flex mr-auto p-2">Обновивший пользователь</div>')
-        elif is_update_time:
+        elif column == 'is_update_time':
             edit += format_html('<div class="d-flex mr-auto p-2">Дата обновления</div>')
 
-        sort_icon = self.render_sort_icon(column, is_user=is_user, is_filial=is_filial, is_update_user=is_update_user,
-                                          is_update_time=is_update_time)
-        filter_icon = self.render_column_header(column) if column else ''
+        sort_icon = self.render_sort_icon(column)
+        if isinstance(column, Column):
+            filter_icon = self.render_column_header(column)
+        elif column == 'is_update_time':
+            current_filter = None
+            filter_icon = format_html(self._render_date_filter(column, current_filter))
+        else:
+            current_filter = self.request.GET.get(f'filter_{column}', '')
+            filter_icon = format_html(self._render_text_filter(column, current_filter))
 
         return format_html(
             '<div class="d-flex align-items-center">{} {} {}</div>',
@@ -464,32 +488,32 @@ class DynamicTable(tables.Table):
             filter_icon
         )
 
-    def _get_sort_params(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
-        if column:  # Для обычных колонок таблицы
+    def _get_sort_params(self, column):
+        if isinstance(column, Column):  # Для обычных колонок таблицы
             return {
                 'sort_field': f'col_{column.id}',
                 'asc_sort': f'col_{column.id}',
                 'desc_sort': f'-col_{column.id}'
             }
-        elif is_user:  # Для колонки пользователя
+        elif column == 'is_user':  # Для колонки пользователя
             return {
                 'sort_field': 'user',
                 'asc_sort': 'user',
                 'desc_sort': '-user'
             }
-        elif is_filial:  # Для колонки филиала
+        elif column == 'is_filial':  # Для колонки филиала
             return {
                 'sort_field': 'filial',
                 'asc_sort': 'filial',
                 'desc_sort': '-filial'
             }
-        elif is_update_user:
+        elif column == 'is_update_user':
             return {
                 'sort_field': 'update_user',
                 'asc_sort': 'update_user',
                 'desc_sort': '-update_user'
             }
-        elif is_update_time:
+        elif column == 'is_update_time':
             return {
                 'sort_field': 'update_time',
                 'asc_sort': 'update_time',
@@ -497,19 +521,11 @@ class DynamicTable(tables.Table):
             }
         return None
 
-    def render_sort_icon(self, column=None, is_user=False, is_filial=False, is_update_user=False, is_update_time=False):
+    def render_sort_icon(self, column):
         sort_params = None
 
         if column:
-            sort_params = self._get_sort_params(column=column)
-        elif is_user:
-            sort_params = self._get_sort_params(is_user=is_user)  # Для колонки user
-        elif is_filial:
-            sort_params = self._get_sort_params(is_filial=is_filial)  # Для колонки filial
-        elif is_update_user:
-            sort_params = self._get_sort_params(is_update_user=is_update_user)  # Для колонки filial
-        elif is_update_time:
-            sort_params = self._get_sort_params(is_update_time=is_update_time)  # Для колонки filial
+            sort_params = self._get_sort_params(column)
 
         if not sort_params:
             return ''

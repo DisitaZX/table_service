@@ -796,6 +796,32 @@ def filter_func(queryset, columns, request):
 
         return queryset, search_query
 
+    filter_filial = request.GET.get('filter_is_filial', '')
+    filter_user = request.GET.get('filter_is_user', '')
+    filter_update_user = request.GET.get('filter_is_update_user', '')
+    filter_update_time = request.GET.get('filter_is_update_time', '')
+    if filter_filial:
+        print("DONE DONE DOEN")
+        queryset = queryset.filter(
+            Q(filial__name__icontains=filter_filial)
+        ).distinct()
+    elif filter_user:
+        queryset = queryset.filter(
+            Q(created_by__profile__employee__firstname__icontains=filter_user) |
+            Q(created_by__profile__employee__secondname__icontains=filter_user) |
+            Q(created_by__profile__employee__lastname__icontains=filter_user)
+        ).distinct()
+    elif filter_update_user:
+        queryset = queryset.filter(
+            Q(updated_by__profile__employee__firstname__icontains=filter_update_user) |
+            Q(updated_by__profile__employee__secondname__icontains=filter_update_user) |
+            Q(updated_by__profile__employee__lastname__icontains=filter_update_user)
+        ).distinct()
+    elif filter_update_time:
+        queryset = queryset.filter(
+            Q(last_date=filter_update_time)
+        ).distinct()
+
     # Фильтрация по колонкам
     for column in columns:
         filter_value = request.GET.get(f'filter_{column.id}')
