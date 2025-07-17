@@ -333,7 +333,6 @@ class DynamicTable(tables.Table):
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{field_name}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
-                    <input type="hidden" name="filter_column" value="{field_name}">
                     <div class="mb-2">
                         <label class="form-label">От</label>
                         <input type="date" name="filter_{field_name}_start" 

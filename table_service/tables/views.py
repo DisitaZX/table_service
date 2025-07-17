@@ -799,28 +799,38 @@ def filter_func(queryset, columns, request):
     filter_filial = request.GET.get('filter_is_filial', '')
     filter_user = request.GET.get('filter_is_user', '')
     filter_update_user = request.GET.get('filter_is_update_user', '')
-    filter_update_time = request.GET.get('filter_is_update_time', '')
+    filter_update_time_start = request.GET.get('filter_is_update_time_start', '')
+    filter_update_time_end = request.GET.get('filter_is_update_time_end', '')
     if filter_filial:
-        print("DONE DONE DOEN")
         queryset = queryset.filter(
             Q(filial__name__icontains=filter_filial)
         ).distinct()
-    elif filter_user:
+    if filter_user:
         queryset = queryset.filter(
             Q(created_by__profile__employee__firstname__icontains=filter_user) |
             Q(created_by__profile__employee__secondname__icontains=filter_user) |
             Q(created_by__profile__employee__lastname__icontains=filter_user)
         ).distinct()
-    elif filter_update_user:
+    if filter_update_user:
         queryset = queryset.filter(
             Q(updated_by__profile__employee__firstname__icontains=filter_update_user) |
             Q(updated_by__profile__employee__secondname__icontains=filter_update_user) |
             Q(updated_by__profile__employee__lastname__icontains=filter_update_user)
         ).distinct()
-    elif filter_update_time:
-        queryset = queryset.filter(
-            Q(last_date=filter_update_time)
-        ).distinct()
+    if filter_update_time_start:
+        try:
+            queryset = queryset.filter(
+                Q(last_date__gte=filter_update_time_start)
+            ).distinct()
+        except ValueError:
+            pass
+        if filter_update_time_end:
+            try:
+                queryset = queryset.filter(
+                    Q(last_date__lte=filter_update_time_end)
+                ).distinct()
+            except ValueError:
+                pass
 
     # Фильтрация по колонкам
     for column in columns:
@@ -839,7 +849,7 @@ def filter_func(queryset, columns, request):
                 cells__column=column,
                 cells__boolean_value=bool_value
             )
-        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.POSITIVE_INTEGER]:
+        elif column.data_type in [Column.ColumnType.INTEGER, Column.ColumnType.POSITIVE_INTEGER] and filter_value:
             # Фильтр для целых чисел
             min_value = request.GET.get(f'filter_{column.id}_min')
             max_value = request.GET.get(f'filter_{column.id}_max')
@@ -860,7 +870,7 @@ def filter_func(queryset, columns, request):
                     )
                 except ValueError:
                     pass
-        elif column.data_type == Column.ColumnType.FLOAT:
+        elif column.data_type == Column.ColumnType.FLOAT and filter_value:
             # Фильтр для чисел с плавающей точкой
             min_value = request.GET.get(f'filter_{column.id}_min')
             max_value = request.GET.get(f'filter_{column.id}_max')
@@ -881,7 +891,7 @@ def filter_func(queryset, columns, request):
                     )
                 except ValueError:
                     pass
-        elif column.data_type == Column.ColumnType.DATE:
+        elif column.data_type == Column.ColumnType.DATE and filter_value:
             # Фильтр для дат
             start_date = request.GET.get(f'filter_{column.id}_start')
             end_date = request.GET.get(f'filter_{column.id}_end')
