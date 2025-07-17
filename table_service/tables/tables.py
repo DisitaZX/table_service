@@ -14,7 +14,10 @@ class ExportTable(tables.Table):
             'class': 'table table-bordered table-hover',
             'thead': {
                 'class': 'table-light'
-            }
+            },
+            'th': {
+                'style': 'white-space: nowrap;',  # Запрет переноса
+            },
         }
         fields = ()  # Будем заполнять динамически
 
@@ -44,7 +47,7 @@ class ExportTable(tables.Table):
             )
 
             self.base_columns['update_user'] = tables.Column(
-                verbose_name='Обновлено',
+                verbose_name='Обновивший пользователь',
                 accessor=f'updated_by__profile__employee',
                 attrs={
                     'td': {'class': 'text-center'}
@@ -53,7 +56,7 @@ class ExportTable(tables.Table):
             )
 
             self.base_columns['update_date'] = tables.Column(
-                verbose_name='Обновлено',
+                verbose_name='Дата обновления',
                 accessor=f'last_date',
                 attrs={
                     'td': {'class': 'text-center'}
