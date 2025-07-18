@@ -674,12 +674,22 @@ def import_table(request):
                         request.session['is_edit_only_you'] = is_edit_only_you
 
                         dataset = ImportFile(import_file)
-                        request.session['headers'] = dataset.get_column_header()
+                        headers = dataset.get_column_header()
+
+                        # Проверка на уникальность заголовков
+                        if len(headers) != len(set(headers)):
+                            duplicate_headers = [h for h in headers if headers.count(h) > 1]
+                            form.add_error('import_file',
+                                           f"Найдены повторяющиеся заголовки столбцов: {', '.join(set(duplicate_headers))}"
+                                           )
+                            return render(request, 'tables/export/import_table.html', {'form': form})
+
+                        request.session['headers'] = headers
                         serialized_data = json.dumps(dataset.get_dataset_dict(), cls=DjangoJSONEncoder)
                         request.session['dataset'] = json.loads(serialized_data)
 
                         column_forms = []
-                        for header in dataset.get_column_header():
+                        for header in headers:
                             if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
                                 column_forms.append(ColumnTypeImportForm(initial={
                                     'column_name': header,
@@ -752,10 +762,11 @@ def import_table(request):
                     row = Row.objects.create(
                         table=table,
                         order=table.rows.count(),
-                        filial=Filial.objects.get(name=filial) if filial else None,
-                        created_by=profile_created.user if profile_created else None,
-                        updated_by=profile_updated.user if profile_updated else None,
-                        last_date=datetime.datetime.fromisoformat(last_date) if last_date else None,
+                        filial=Filial.objects.get(name=filial)
+                        if filial else Filial.objects.get(id=request.user.profile.employee.id_filial),
+                        created_by=profile_created.user if profile_created else request.user,
+                        updated_by=profile_updated.user if profile_updated else request.user,
+                        last_date=datetime.datetime.fromisoformat(last_date) if last_date else datetime.datetime.now(),
                     )
                     for header, item in row_x.items():
                         if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:

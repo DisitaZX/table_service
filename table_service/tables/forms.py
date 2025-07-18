@@ -504,7 +504,9 @@ class AddFile(forms.Form):
     import_file = forms.FileField(
             label="Импорт файла:",
             required=True,
-            help_text="Поддерживаются следущие форматы: .csv, .xls, .xlsx",
+            help_text="Поддерживаются следущие форматы: .csv, .xls, .xlsx\n"
+                      "Колонки: 'Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления',"
+                      " являются сервисными\n Если их не будет в таблице значения у каждой строки будет эквивалентно вашей пользовательской карточке",
             validators=[FileExtensionValidator(allowed_extensions=['csv', 'xls', 'xlsx'],
                                                message="Неверный формат файла!")]
         )
