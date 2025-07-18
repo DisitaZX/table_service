@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Выберите типы данных для колонок</h2>
+    <p>Файл: <strong>{{ filename }}</strong></p>
+
+    <form method="post" id="types-form">
+        {% csrf_token %}
+        <input type="hidden" name="confirm_types" value="1">
+
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Колонка</th>
+                        <th>Тип данных</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for form in column_forms %}
+                    <tr>
+                        <td>{{ form.column_name.value }}</td>
+                        <td>
+                            <input type="hidden" name="column_{{ form.column_name.value }}"
+                                   value="{{ form.column_name.value }}">
+                            <select name="type_{{ form.column_name.value }}"
+                                    class="form-select">
+                                {% for value, label in form.fields.data_type.choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-3">
+            <a href="{% url 'table_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times me-1"></i> Отмена
+            </a>
+            <a href="{% url 'import_table' %}" class="btn btn-secondary">
+                <i class="fa-solid fa-rotate-left"></i> Назад
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i> Загрузить данные
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Импортировать новую таблицу{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Импортировать новую таблицу
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.title.id_for_label }}" class="form-label">
+                            {{ form.title.label }}
+                        </label>
+                        {{ form.title }}
+                        <label for="{{ form.import_file.id_for_label }}" class="form-label mt-3">
+                            {{ form.import_file.label }}
+                        </label>
+                        {{ form.import_file }}
+                        {% if form.import_file.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.import_file.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.import_file.help_text }}
+                        </small>
+                        <div class="form-check mt-3">
+                            {{ form.is_edit_only_you }}
+                            <div class="d-flex flex-column">
+                                <label class="form-check-label" for="{{ form.is_edit_only_you.id_for_label }}">
+                                    {{ form.is_edit_only_you.label }}
+                                </label>
+                                <small class="form-text text-muted">
+                                    {{ form.is_edit_only_you.help_text }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'table_list' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-arrow-right"></i> Далее
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Добавляем класс form-control ко всем input в форме
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('id_import_file').classList.add('form-control');
+    document.getElementById('id_is_edit_only_you').classList.add('form-check-input');
+});
+</script>
+{% endblock %}

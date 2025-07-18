@@ -550,7 +550,21 @@ class Cell(models.Model):
         elif self.column.data_type == Column.ColumnType.CHOICE:
             self.choice_value = val if val is not None else None
         elif self.column.data_type == Column.ColumnType.DATE:
-            self.date_value = val if val is not None else None  # Здесь val уже datetime.date
+            if val is not None:
+                if isinstance(val, str):
+                    date_formats = ['%Y-%m-%d', '%d.%m.%Y', '%d/%m/%Y', '%m/%d/%Y']
+                    for fmt in date_formats:
+                        try:
+                            val = datetime.datetime.strptime(val, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    if isinstance(val, date):
+                        self.date_value = val
+                    else:
+                        self.date_value = None
+            else:
+                self.date_value = None
         else:  # TEXT
             self.text_value = str(val) if val is not None else ''
 

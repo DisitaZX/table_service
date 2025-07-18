@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
 from django.utils.safestring import mark_safe
 
 from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission, UserFilial
@@ -489,6 +490,71 @@ class RowEditForm(forms.Form):
                             'placeholder': 'Введите текст'
                         }),
                     )
+
+
+class AddFile(forms.Form):
+    title = forms.CharField(
+            label="Название таблицы:",
+            required=True,
+            widget=forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите текст'
+            }),
+        )
+    import_file = forms.FileField(
+            label="Импорт файла:",
+            required=True,
+            help_text="Поддерживаются следущие форматы: .csv, .xls, .xlsx",
+            validators=[FileExtensionValidator(allowed_extensions=['csv', 'xls', 'xlsx'],
+                                               message="Неверный формат файла!")]
+        )
+    is_edit_only_you = forms.BooleanField(
+            label="Редактировать свои:",
+            required=False,
+            help_text="Если отмечено, то в таблице можно редактировать только свои строки",
+            widget=forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class ColumnTypeImportForm(forms.Form):
+    TYPE_CHOICES = [
+        ('text', 'Текст'),
+        ('integer', 'Целое число'),
+        ('pos_integer', 'Целое число больше нуля'),
+        ('float', 'Число с плавающей точкой'),
+        ('boolean', 'Логическое'),
+        ('date', 'Дата'),
+        ('email', 'Почта'),
+        ('url', 'Ссылка'),
+        ('file', 'Файл'),
+        ('choice', 'Выбор из списка')
+    ]
+
+    column_name = forms.CharField(
+        label='Название колонки',
+        required=True,
+        widget=forms.TextInput(attrs={'readonly': 'readonly'}))
+    data_type = forms.ChoiceField(
+        label='Тип данных',
+        required=True,
+        choices=TYPE_CHOICES)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields['column_name'] = forms.CharField(
+            label='Название колонки',
+            required=True,
+            widget=forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите текст'
+            }),
+        )
 
 
 class FileInputWithPreview(forms.FileInput):

@@ -1,6 +1,8 @@
 import datetime
+import json
 import os
 from django.core.files.storage import default_storage
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import F, Value, TextField, Subquery, OuterRef, Q
 from django.db.models.fields.files import FieldFile
@@ -12,10 +14,13 @@ from django.http import JsonResponse, HttpResponseForbidden, FileResponse
 from django.urls import reverse
 from django.template.loader import render_to_string
 from django_tables2.export import TableExport
+
+from .import_file import ImportFile
 from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission, \
-    TableFilialPermission, Admin, UserFilial
+    TableFilialPermission, Admin, UserFilial, Profile
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
-    TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm
+    TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm, AddFile, \
+    ColumnTypeImportForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -655,6 +660,120 @@ def export_table(request, table_pk):
 
 
 @login_required
+def import_table(request):
+    if request.method == 'POST':
+        with transaction.atomic():
+            if 'import_file' in request.FILES:
+                form = AddFile(request.POST, request.FILES)
+                if form.is_valid():
+                    title = form.cleaned_data['title']
+                    import_file = form.cleaned_data['import_file']
+                    is_edit_only_you = form.cleaned_data['is_edit_only_you']
+                    if import_file:
+                        request.session['title'] = title
+                        request.session['is_edit_only_you'] = is_edit_only_you
+
+                        dataset = ImportFile(import_file)
+                        request.session['headers'] = dataset.get_column_header()
+                        serialized_data = json.dumps(dataset.get_dataset_dict(), cls=DjangoJSONEncoder)
+                        request.session['dataset'] = json.loads(serialized_data)
+
+                        column_forms = []
+                        for header in dataset.get_column_header():
+                            if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
+                                column_forms.append(ColumnTypeImportForm(initial={
+                                    'column_name': header,
+                                    'data_type': 'text'
+                                }))
+
+                        return render(request, 'tables/export/select_types.html', {
+                            'column_forms': column_forms,
+                            'filename': import_file.name
+                        })
+
+            elif 'confirm_types' in request.POST:
+                table = Table.objects.create(
+                    title=request.session.get('title'),
+                    owner=request.user,
+                    created_at=datetime.datetime.now(),
+                    is_edit_only_you=request.session.get('is_edit_only_you')
+                )
+
+                headers = request.session.get('headers', [])
+                dataset = request.session.get('dataset', [])
+
+                list_of_columns = []
+
+                for header in headers:
+                    if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
+                        field_name = f"type_{header}"
+                        if field_name in request.POST:
+                            col = Column.objects.create(
+                                table=table,
+                                name=header,
+                                order=table.columns.count(),
+                                data_type=request.POST[field_name],
+                            )
+                            list_of_columns.append(col)
+                for row_x in dataset:
+                    created_by = row_x['Пользователь']
+                    updated_by = row_x['Обновивший пользователь']
+                    last_date = row_x['Дата обновления']
+
+                    profile_created = None
+                    if created_by:
+                        created_by = created_by.split()
+
+                        employee_created = Employee.objects.filter(
+                            secondname=created_by[0],
+                            firstname=created_by[1],
+                            lastname=created_by[2]
+                        ).first()
+                        profile_created = Profile.objects.filter(employee=employee_created).first()
+
+                    profile_updated = None
+                    if updated_by:
+                        updated_by = updated_by.split()
+                        employee_updated = Employee.objects.filter(
+                            secondname=updated_by[0],
+                            firstname=updated_by[1],
+                            lastname=updated_by[2]
+                        ).first()
+                        profile_updated = Profile.objects.filter(employee=employee_updated).first()
+
+                    row = Row.objects.create(
+                        table=table,
+                        order=table.rows.count(),
+                        filial=Filial.objects.get(name=row_x['Филиал']),
+                        created_by=profile_created.user if profile_created else None,
+                        updated_by=profile_updated.user if profile_updated else None,
+                        last_date=datetime.datetime.fromisoformat(last_date),
+                    )
+                    for header, item in row_x.items():
+                        if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
+                            for column in list_of_columns:
+                                if column.name == header:
+                                    break
+                            cell = Cell.objects.create(
+                                row=row,
+                                column=column
+                            )
+                            cell.value = item
+                            cell.save()
+
+                if 'title' in request.session:
+                    del request.session['title']
+                    del request.session['is_edit_only_you']
+                    del request.session['headers']
+                    del request.session['dataset']
+                return redirect('table_detail', pk=table.pk)
+        return redirect('import_table')
+    else:
+        form = AddFile()
+    return render(request, 'tables/export/import_table.html', {'form': form})
+
+
+@login_required
 def download_file(request, name_file):
     full_path = os.path.join(settings.MEDIA_ROOT + '/files', name_file)
     if not os.path.exists(full_path):
@@ -898,8 +1017,6 @@ def filter_func(queryset, columns, request):
             # Фильтр для дат
             start_date = request.GET.get(f'filter_{column.id}_start')
             end_date = request.GET.get(f'filter_{column.id}_end')
-            print(start_date)
-            print(end_date)
             if start_date:
                 try:
                     start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()

@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/unlock_row/<int:row_pk>/', views.unlock_row_api, name='unlock_row_api'),
     path('admins/', views.manage_admins, name='manage_admins'),
     path('<int:table_pk>/export/', views.export_table, name='export_table'),
+    path('import_table/', views.import_table, name='import_table'),
     path('media/files/<str:name_file>', views.download_file, name='download_file'),
     path('ajax/get-user-filials/', views.get_user_filials, name='get_user_filials'),
 ]
