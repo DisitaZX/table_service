@@ -716,9 +716,17 @@ def import_table(request):
                             )
                             list_of_columns.append(col)
                 for row_x in dataset:
-                    created_by = row_x['Пользователь']
-                    updated_by = row_x['Обновивший пользователь']
-                    last_date = row_x['Дата обновления']
+                    filial = None
+                    created_by = None
+                    updated_by = None
+                    last_date = None
+                    try:
+                        filial = row_x['Филиал']
+                        created_by = row_x['Пользователь']
+                        updated_by = row_x['Обновивший пользователь']
+                        last_date = row_x['Дата обновления']
+                    except KeyError:
+                        pass
 
                     profile_created = None
                     if created_by:
@@ -744,10 +752,10 @@ def import_table(request):
                     row = Row.objects.create(
                         table=table,
                         order=table.rows.count(),
-                        filial=Filial.objects.get(name=row_x['Филиал']),
+                        filial=Filial.objects.get(name=filial) if filial else None,
                         created_by=profile_created.user if profile_created else None,
                         updated_by=profile_updated.user if profile_updated else None,
-                        last_date=datetime.datetime.fromisoformat(last_date),
+                        last_date=datetime.datetime.fromisoformat(last_date) if last_date else None,
                     )
                     for header, item in row_x.items():
                         if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
