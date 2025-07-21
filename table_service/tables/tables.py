@@ -252,7 +252,7 @@ class DynamicTable(tables.Table):
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton_{column.id}">
                 <li><a class="dropdown-item {'active' if not current_filter else ''}" 
-                       href="?{self._get_filter_query(column.id, '')}">Все</a></li>
+                       href="?{self._get_filter_query(column.id, None)}">Все</a></li>
                 {"".join([
             f'<li><a class="dropdown-item {"active" if current_filter == choice else ""}" '
             f'href="?{self._get_filter_query(column.id, choice)}">{choice}</a></li>'
@@ -273,7 +273,7 @@ class DynamicTable(tables.Table):
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton_{column.id}">
                 <li><a class="dropdown-item {'active' if not current_filter else ''}" 
-                       href="?{self._get_filter_query(column.id, '')}">Все</a></li>
+                       href="?{self._get_filter_query(column.id, None)}">Все</a></li>
                 <li><a class="dropdown-item {'active' if current_filter == 'true' else ''}" 
                        href="?{self._get_filter_query(column.id, 'true')}">Да</a></li>
                 <li><a class="dropdown-item {'active' if current_filter == 'false' else ''}" 
@@ -311,7 +311,7 @@ class DynamicTable(tables.Table):
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(column.id, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(column.id, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
@@ -352,7 +352,7 @@ class DynamicTable(tables.Table):
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(field_name, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(field_name, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
