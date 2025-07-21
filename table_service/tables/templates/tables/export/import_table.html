@@ -3,7 +3,18 @@
 {% block title %}Импортировать новую таблицу{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
+<div id="upload-progress" style="display: none; text-align: center;">
+    <div class="spinner-border text-primary" role="status" style="display: inline-block;">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
+    <div style="margin-top: 10px;">
+        <small class="form-text text-muted">
+            Пожалуйста подождите, загрузка столбцов таблицы может занять некоторое время
+        </small>
+    </div>
+</div>
+
+<div id="form_input" class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
@@ -12,7 +23,7 @@
                 </h4>
             </div>
             <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+                <form id="types-form" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
 
                     <div class="mb-3">
@@ -67,6 +78,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('id_import_file').classList.add('form-control');
     document.getElementById('id_is_edit_only_you').classList.add('form-check-input');
+
+    const form_input = document.getElementById('form_input');
+    const form = document.getElementById('types-form');
+    const uploadProgress = document.getElementById('upload-progress');
+
+    form.addEventListener('submit', function() {
+        // Показываем индикатор загрузки
+        uploadProgress.style.display = 'block';
+        form_input.style.display = 'none';
+    });
 });
 </script>
 {% endblock %}

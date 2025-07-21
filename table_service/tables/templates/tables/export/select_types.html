@@ -1,7 +1,18 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
+<div id="upload-progress" style="display: none; text-align: center;">
+    <div class="spinner-border text-primary" role="status" style="display: inline-block;">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
+    <div style="margin-top: 10px;">
+        <small class="form-text text-muted">
+            Пожалуйста подождите, импортирование всей таблицы может занять некоторое время
+        </small>
+    </div>
+</div>
+
+<div id="form_input" class="container mt-4">
     <h2>Выберите типы данных для колонок</h2>
     <p>Файл: <strong>{{ filename }}</strong></p>
 
@@ -52,6 +63,16 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form_input = document.getElementById('form_input');
+    const form = document.getElementById('types-form');
+    const uploadProgress = document.getElementById('upload-progress');
 
+    form.addEventListener('submit', function() {
+        // Показываем индикатор загрузки
+        uploadProgress.style.display = 'block';
+        form_input.style.display = 'none';
+    });
+});
 </script>
 {% endblock %}

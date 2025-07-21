@@ -540,7 +540,7 @@ class ColumnTypeImportForm(forms.Form):
     column_name = forms.CharField(
         label='Название колонки',
         required=True,
-        widget=forms.TextInput(attrs={'readonly': 'readonly'}))
+    )
     data_type = forms.ChoiceField(
         label='Тип данных',
         required=True,
@@ -548,15 +548,6 @@ class ColumnTypeImportForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self.fields['column_name'] = forms.CharField(
-            label='Название колонки',
-            required=True,
-            widget=forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Введите текст'
-            }),
-        )
 
 
 class FileInputWithPreview(forms.FileInput):

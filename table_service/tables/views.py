@@ -713,7 +713,6 @@ def import_table(request):
                 dataset = request.session.get('dataset', [])
 
                 list_of_columns = []
-
                 for header in headers:
                     if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
                         field_name = f"type_{header}"
@@ -725,7 +724,11 @@ def import_table(request):
                                 data_type=request.POST[field_name],
                             )
                             list_of_columns.append(col)
-                for row_x in dataset:
+
+                if len(list_of_columns) != len(headers):
+                    raise ValueError("Несоответствие количества столбцов: попробуйте изменить названия колонок (Например: убрать лишние пробелы).")
+
+                for i, row_x in enumerate(dataset, 1):
                     filial = None
                     created_by = None
                     updated_by = None
