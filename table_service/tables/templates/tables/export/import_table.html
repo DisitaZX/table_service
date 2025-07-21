@@ -32,7 +32,7 @@
                             </div>
                         {% endif %}
                         <small class="form-text text-muted">
-                            {{ form.import_file.help_text }}
+                            {{ form.import_file.help_text|linebreaksbr }}
                         </small>
                         <div class="form-check mt-3">
                             {{ form.is_edit_only_you }}
