@@ -702,93 +702,93 @@ def import_table(request):
                         })
 
             elif 'confirm_types' in request.POST:
-                table = Table.objects.create(
-                    title=request.session.get('title'),
-                    owner=request.user,
-                    created_at=datetime.datetime.now(),
-                    is_edit_only_you=request.session.get('is_edit_only_you')
-                )
-
-                headers = request.session.get('headers', [])
-                dataset = request.session.get('dataset', [])
-
-                list_of_columns = []
-                for header in headers:
-                    if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
-                        field_name = f"type_{header}"
-                        if field_name in request.POST:
-                            col = Column.objects.create(
-                                table=table,
-                                name=header,
-                                order=table.columns.count(),
-                                data_type=request.POST[field_name],
-                            )
-                            list_of_columns.append(col)
-
-                if len(list_of_columns) != len(headers):
-                    raise ValueError("Несоответствие количества столбцов: попробуйте изменить названия колонок (Например: убрать лишние пробелы).")
-
-                for i, row_x in enumerate(dataset, 1):
-                    filial = None
-                    created_by = None
-                    updated_by = None
-                    last_date = None
-                    try:
-                        filial = row_x['Филиал']
-                        created_by = row_x['Пользователь']
-                        updated_by = row_x['Обновивший пользователь']
-                        last_date = row_x['Дата обновления']
-                    except KeyError:
-                        pass
-
-                    profile_created = None
-                    if created_by:
-                        created_by = created_by.split()
-
-                        employee_created = Employee.objects.filter(
-                            secondname=created_by[0],
-                            firstname=created_by[1],
-                            lastname=created_by[2]
-                        ).first()
-                        profile_created = Profile.objects.filter(employee=employee_created).first()
-
-                    profile_updated = None
-                    if updated_by:
-                        updated_by = updated_by.split()
-                        employee_updated = Employee.objects.filter(
-                            secondname=updated_by[0],
-                            firstname=updated_by[1],
-                            lastname=updated_by[2]
-                        ).first()
-                        profile_updated = Profile.objects.filter(employee=employee_updated).first()
-
-                    row = Row.objects.create(
-                        table=table,
-                        order=table.rows.count(),
-                        filial=Filial.objects.get(name=filial)
-                        if filial else Filial.objects.get(id=request.user.profile.employee.id_filial),
-                        created_by=profile_created.user if profile_created else request.user,
-                        updated_by=profile_updated.user if profile_updated else request.user,
-                        last_date=datetime.datetime.fromisoformat(last_date) if last_date else datetime.datetime.now(),
+                try:
+                    table = Table.objects.create(
+                        title=request.session.get('title'),
+                        owner=request.user,
+                        created_at=datetime.datetime.now(),
+                        is_edit_only_you=request.session.get('is_edit_only_you')
                     )
-                    for header, item in row_x.items():
-                        if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
-                            for column in list_of_columns:
-                                if column.name == header:
-                                    break
-                            cell = Cell.objects.create(
-                                row=row,
-                                column=column
-                            )
-                            cell.value = item
-                            cell.save()
 
-                if 'title' in request.session:
-                    del request.session['title']
-                    del request.session['is_edit_only_you']
-                    del request.session['headers']
-                    del request.session['dataset']
-                return redirect('table_detail', pk=table.pk)
+                    headers = request.session.get('headers', [])
+                    dataset = request.session.get('dataset', [])
+
+                    list_of_columns = []
+                    for header in headers:
+                        if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
+                            field_name = f"type_{header}"
+                            if field_name in request.POST:
+                                col = Column.objects.create(
+                                    table=table,
+                                    name=header,
+                                    order=table.columns.count(),
+                                    data_type=request.POST[field_name],
+                                )
+                                list_of_columns.append(col)
+
+                    for i, row_x in enumerate(dataset, 1):
+                        filial = None
+                        created_by = None
+                        updated_by = None
+                        last_date = None
+                        try:
+                            filial = row_x['Филиал']
+                            created_by = row_x['Пользователь']
+                            updated_by = row_x['Обновивший пользователь']
+                            last_date = row_x['Дата обновления']
+                        except KeyError:
+                            pass
+
+                        profile_created = None
+                        if created_by:
+                            created_by = created_by.split()
+
+                            employee_created = Employee.objects.filter(
+                                secondname=created_by[0],
+                                firstname=created_by[1],
+                                lastname=created_by[2]
+                            ).first()
+                            profile_created = Profile.objects.filter(employee=employee_created).first()
+
+                        profile_updated = None
+                        if updated_by:
+                            updated_by = updated_by.split()
+                            employee_updated = Employee.objects.filter(
+                                secondname=updated_by[0],
+                                firstname=updated_by[1],
+                                lastname=updated_by[2]
+                            ).first()
+                            profile_updated = Profile.objects.filter(employee=employee_updated).first()
+
+                        row = Row.objects.create(
+                            table=table,
+                            order=table.rows.count(),
+                            filial=Filial.objects.get(name=filial)
+                            if filial else Filial.objects.get(id=request.user.profile.employee.id_filial),
+                            created_by=profile_created.user if profile_created else request.user,
+                            updated_by=profile_updated.user if profile_updated else request.user,
+                            last_date=datetime.datetime.fromisoformat(last_date) if last_date else datetime.datetime.now(),
+                        )
+                        for header, item in row_x.items():
+                            if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
+                                for column in list_of_columns:
+                                    if column.name == header:
+                                        break
+                                cell = Cell.objects.create(
+                                    row=row,
+                                    column=column
+                                )
+                                cell.value = item
+                                cell.save()
+
+                    if 'title' in request.session:
+                        del request.session['title']
+                        del request.session['is_edit_only_you']
+                        del request.session['headers']
+                        del request.session['dataset']
+                    return redirect('table_detail', pk=table.pk)
+                except Exception as e:
+                    raise ValueError(e)
         return redirect('import_table')
     else:
         form = AddFile()
@@ -1058,20 +1058,48 @@ def filter_func(queryset, columns, request):
                 except ValueError:
                     pass
         elif column.data_type == Column.ColumnType.TEXT and filter_value:
-            queryset = queryset.filter(
-                cells__column=column,
-                cells__text_value__icontains=filter_value
-            )
+            exact = request.GET.get(f'filter_{column.id}_exact')
+            if exact:
+                exact = True
+
+            if exact:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__text_value__exact=filter_value
+                )
+            else:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__text_value__icontains=filter_value
+                )
         elif column.data_type == Column.ColumnType.URL and filter_value:
-            queryset = queryset.filter(
-                cells__column=column,
-                cells__url_value__icontains=filter_value
-            )
+            exact = request.GET.get(f'filter_{column.id}_exact')
+            if exact:
+                exact = True
+            if exact:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__url_value__exact=filter_value
+                )
+            else:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__url_value__icontains=filter_value
+                )
         elif column.data_type == Column.ColumnType.EMAIL and filter_value:
-            queryset = queryset.filter(
-                cells__column=column,
-                cells__email_value__icontains=filter_value
-            )
+            exact = request.GET.get(f'filter_{column.id}_exact')
+            if exact:
+                exact = True
+            if exact:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__email_value__exact=filter_value
+                )
+            else:
+                queryset = queryset.filter(
+                    cells__column=column,
+                    cells__email_value__icontains=filter_value
+                )
 
     return queryset, search_query
 

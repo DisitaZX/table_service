@@ -100,6 +100,7 @@ class DynamicTable(tables.Table):
         model = Row
         attrs = {
             'class': 'table table-bordered table-hover',
+            'style': 'min-height: 300px;',
             'thead': {
                 'class': 'table-light'
             },
@@ -295,7 +296,7 @@ class DynamicTable(tables.Table):
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{column.id}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
-                    <input type="hidden" name="filter_column" value="{column.id}">
+                    {self._get_hidden_params_except(f'filter_{column.id}')}
                     <div class="mb-2">
                         <label class="form-label">От</label>
                         <input type="number" name="filter_{column.id}_min" 
@@ -336,6 +337,7 @@ class DynamicTable(tables.Table):
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{field_name}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
+                    {self._get_hidden_params_except(f'filter_{field_name}')}
                     <div class="mb-2">
                         <label class="form-label">От</label>
                         <input type="date" name="filter_{field_name}_start" 
@@ -363,6 +365,11 @@ class DynamicTable(tables.Table):
         else:
             field_name = column
 
+        exact_match_checked = ""
+        exact_filter_param = f"filter_{field_name}_exact"
+        if self.request.GET.get(exact_filter_param) == "on":
+            exact_match_checked = "checked"
+
         """Рендерит фильтр для текстовых значений"""
         return f"""
         <div class="dropdown">
@@ -373,20 +380,37 @@ class DynamicTable(tables.Table):
             </button>
             <div class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton_{field_name}" style="min-width: 250px;">
                 <form method="get" action="?" class="filter-form">
+                    {self._get_hidden_params_except(f'filter_{field_name}')}
                     <div class="mb-2">
                         <input type="text" name="filter_{field_name}" 
                                value="{current_filter}" 
                                placeholder="Фильтр..."
                                class="form-control form-control-sm">
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="filter_{field_name}_exact" id="exact_{field_name}"
+                                   {exact_match_checked} onclick="this.form.submit()">
+                            <label class="form-check-label" for="exact_{field_name}">
+                                Точное совпадение
+                            </label>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a href="?{self._get_filter_query(field_name, '')}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        <a href="?{self._get_filter_query(field_name, None)}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
                     </div>
                 </form>
             </div>
         </div>
         """
+
+    def _get_hidden_params_except(self, exclude_prefix):
+        """Возвращает скрытые input'ы для всех GET-параметров, кроме указанного префикса"""
+        hidden_inputs = []
+        for key, values in self.request.GET.lists():
+            if not key.startswith(exclude_prefix) and not key.startswith('filter_' + exclude_prefix.split('_')[-1]):
+                for value in values:
+                    hidden_inputs.append(f'<input type="hidden" name="{key}" value="{value}">')
+        return '\n'.join(hidden_inputs)
 
     def get_reset_filters_url(self):
         """Возвращает URL для сброса ВСЕХ фильтров (оставляет сортировку и другие параметры)"""
@@ -402,27 +426,30 @@ class DynamicTable(tables.Table):
     def _get_filter_query(self, column_id, value):
         """Генерирует GET-запрос с фильтром для колонки, сохраняя другие фильтры"""
         params = self.request.GET.copy()
-        # Если передано значение (не сброс фильтра), добавляем соответствующие параметры
-        if value:
+
+        # Удаляем все параметры фильтрации для текущей колонки
+        keys_to_remove = [
+            f'filter_{column_id}',
+            f'filter_{column_id}_min',
+            f'filter_{column_id}_max',
+            f'filter_{column_id}_start',
+            f'filter_{column_id}_end',
+            f'filter_{column_id}_exact',
+        ]
+
+        for key in keys_to_remove:
+            if key in params:
+                del params[key]
+
+        # Если передано значение (не None), добавляем соответствующие параметры
+        if value is not None:
             if isinstance(value, dict):  # Для сложных фильтров (диапазоны)
                 for k, v in value.items():
                     if v:  # Добавляем только непустые значения
                         params[f'filter_{column_id}_{k}'] = v
             else:  # Для простых фильтров (одиночное значение)
                 params[f'filter_{column_id}'] = value
-        else:
-            # Удаляем все параметры фильтрации для текущей колонки
-            keys_to_remove = [
-                f'filter_{column_id}',
-                f'filter_{column_id}_min',
-                f'filter_{column_id}_max',
-                f'filter_{column_id}_start',
-                f'filter_{column_id}_end'
-            ]
 
-            for key in keys_to_remove:
-                if key in params:
-                    del params[key]
         return params.urlencode()
 
     def get_column_header(self, column):
