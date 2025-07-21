@@ -568,9 +568,6 @@ class Cell(models.Model):
         else:  # TEXT
             self.text_value = str(val) if val is not None else ''
 
-    class Meta:
-        unique_together = ('row', 'column')
-
     def __str__(self):
         return f"{self.row} - {self.column}: {self.value}"
 

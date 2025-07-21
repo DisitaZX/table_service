@@ -9,6 +9,7 @@ urlpatterns = [
     path('', views.table_list, name='table_list'),
     path('create/', views.create_table, name='create_table'),
     path('<int:pk>/', views.table_detail, name='table_detail'),
+    path('<int:pk>/edit_table', views.edit_table, name='edit_table'),
     path('<int:pk>/delete_table', views.delete_table, name='delete_table'),
     path('<int:pk>/add_column/', views.add_column, name='add_column'),
     path('<int:pk>/<int:column_pk>/edit_column/', views.edit_column, name='edit_column'),

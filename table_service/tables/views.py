@@ -20,7 +20,7 @@ from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission,
     TableFilialPermission, Admin, UserFilial, Profile
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
     TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm, AddFile, \
-    ColumnTypeImportForm
+    ColumnTypeImportForm, TableEditForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -131,6 +131,25 @@ def create_table(request):
     else:
         form = TableForm()
     return render(request, 'tables/create_table.html', {'form': form})
+
+
+@login_required
+def edit_table(request, pk):
+    table = get_object_or_404(Table, pk=pk)
+    # Проверка прав (только владелец может переименовывать таблицу)
+    if not (table.owner == request.user or table.is_admin(request.user)):
+        return HttpResponseForbidden("Вы не можете редактировать параметры этой таблицы")
+
+    if request.method == 'POST':
+        form = TableEditForm(request.POST, instance=table)
+        if form.is_valid():
+            with transaction.atomic():
+                form.save()
+                messages.success(request, f'Таблица успешно обновлена')
+                return redirect('table_list')
+    else:
+        form = TableEditForm(instance=table)
+    return render(request, 'tables/edit_table.html', {'form': form, 'table': table})
 
 
 @login_required

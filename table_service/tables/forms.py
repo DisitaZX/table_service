@@ -18,6 +18,20 @@ class TableForm(forms.ModelForm):
         }
 
 
+class TableEditForm(forms.ModelForm):
+    class Meta:
+        model = Table
+        fields = ['title', 'is_edit_only_you']
+        widgets = {
+            'is_edit_only_you': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class ColumnForm(forms.ModelForm):
     class Meta:
         model = Column
