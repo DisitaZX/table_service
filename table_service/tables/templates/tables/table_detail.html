@@ -82,6 +82,7 @@
     <a href="{{ table.get_reset_filters_url }}" class="btn btn-sm btn-outline-secondary mb-3">
         <i class="bi bi-funnel"> Сбросить все фильтры</i>
     </a>
+    {% if mass_permissions %}
     {% with filter_params=request.GET.urlencode %}
         {% if "filter" in filter_params %}
             <div class="dropdown">
@@ -93,24 +94,25 @@
 
                 <!-- Выпадающее меню -->
                 <ul class="dropdown-menu" aria-labelledby="MassEditDropdown">
+                    <!-- Передаём ID всех видимых строк -->
                     {% for row in table.rows %}
                         <input type="hidden" name="row_ids[]" value="{{ row.record.id }}">
                     {% endfor %}
                     <li>
                         <a class="dropdown-item mass-edit-row-btn"
                            data-table-id="{{ table_obj.pk }}">
-                            <!-- Передаём ID всех видимых строк -->
-                            Редактировать выбранные строки
+                            <i class="bi bi-exposure" style="color: green;"></i> Редактировать выбранные строки
                         </a>
                         <a class="dropdown-item mass-delete-row-btn"
                            data-table-id="{{ table_obj.pk }}">
-                            Удалить выбранные строки
+                            <i class="bi bi-x-circle" style="color: red;"></i> Удалить выбранные строки
                         </a>
                     </li>
                 </ul>
             </div>
         {% endif %}
     {% endwith %}
+    {% endif %}
     {% render_table table %}
 </div>
 <!-- Модальное окно добавления строки -->

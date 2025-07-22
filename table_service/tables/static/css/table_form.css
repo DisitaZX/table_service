@@ -69,3 +69,12 @@
     background-color: #ddd;
 }
 
+/* Для основной кнопки */
+.dropdown-toggle {
+    cursor: pointer;
+}
+
+/* Для элементов выпадающего меню */
+.dropdown-item {
+    cursor: pointer;
+}

@@ -139,6 +139,19 @@ class Table(models.Model):
             return True
         return False
 
+    def has_mass_edit_permission(self, user):
+        """Проверяет, может ли пользователь массово редактировать строки в таблице"""
+        if self.owner == user:
+            return True
+        if self.is_admin(user):
+            return True
+
+        mass_right = self.masspermissions.filter(user=user)
+
+        if mass_right:
+            return True
+        return False
+
     @classmethod
     def get_shared_tables(cls, user):
         """Возвращает все таблицы, к которым у пользователя есть доступ"""
@@ -576,6 +589,11 @@ class UserFilial(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     table = models.ForeignKey(Table, on_delete=models.CASCADE)
     filial = models.ForeignKey(Filial, on_delete=models.CASCADE)
+
+
+class MassPermission(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='masspermissions')
 
 
 class TablePermission(models.Model):

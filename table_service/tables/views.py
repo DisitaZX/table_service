@@ -17,10 +17,10 @@ from django_tables2.export import TableExport
 
 from .import_file import ImportFile
 from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission, \
-    TableFilialPermission, Admin, UserFilial, Profile
+    TableFilialPermission, Admin, UserFilial, Profile, MassPermission
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
     TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm, AddFile, \
-    ColumnTypeImportForm, TableEditForm, RowMassEditForm
+    ColumnTypeImportForm, TableEditForm, RowMassEditForm, UserMassEditForm, PermissionUserMassEditForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -333,6 +333,26 @@ def manage_table_permissions(request, table_pk):
 
                     messages.success(request, 'Дополнительные права филиала добавлены')
 
+            elif 'add_mass_edit' in request.POST:
+                user_id = request.POST.get('user')
+                if user_id:
+                    MassPermission.objects.update_or_create(
+                        table=table,
+                        user_id=user_id,
+                    )
+
+                    messages.success(request, 'Массовые права пользователя добавлены')
+
+            elif 'remove_mass_edit' in request.POST:
+                user_id = request.POST.get('mass_edit_id')
+                if user_id:
+                    MassPermission.objects.filter(
+                        table=table,
+                        user_id=user_id,
+                    ).delete()
+
+                    messages.success(request, 'Массовые права пользователя удалены')
+
         return redirect('manage_table_permissions', table_pk=table.pk)
 
     # Получаем текущие разрешения пользователей для таблицы
@@ -360,14 +380,22 @@ def manage_table_permissions(request, table_pk):
         })
         userfilial_permissions.append(perm)
 
+    mass_edit_permissions = []
+    for perm in MassPermission.objects.filter(table=table):
+        perm.form = UserMassEditForm(initial={
+            'user': perm.user
+        })
+        mass_edit_permissions.append(perm)
     return render(request, 'tables/manage_table_permissions.html', {
         'table': table,
         'permissions': permissions,
         'filial_permissions': filial_permissions,
         'userfilial_permissions': userfilial_permissions,
+        'mass_edit_permissions': mass_edit_permissions,
         'user_form': PermissionUserForm(table=table),
         'filial_form': PermissionFilialForm(table=table),
-        'user_filial_form': PermissionUserFilialForm(table=table)
+        'user_filial_form': PermissionUserFilialForm(table=table),
+        'mass_edit_form': PermissionUserMassEditForm(table=table),
     })
 
 
@@ -455,6 +483,10 @@ def delete_row(request, table_pk, row_pk):
 def mass_delete_row(request, table_pk):
     table = get_object_or_404(Table, pk=table_pk)
     row_ids = request.POST.getlist('row_ids[]')
+
+    if not table.has_mass_edit_permission(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Нет прав на массовое удаление'}, status=403)
+
     if not row_ids:
         return JsonResponse({'status': 'error', 'message': 'Нет строк для удаления'}, status=400)
 
@@ -483,8 +515,9 @@ def unlock_row_api(request, row_pk):
 @login_required
 def mass_edit_row(request, table_pk):
     table = get_object_or_404(Table, pk=table_pk)
-    #if not row.has_edit_permission(request.user):
-        #return JsonResponse({'status': 'error', 'message': 'Нет прав на редактирование'}, status=403)
+
+    if not table.has_mass_edit_permission(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Нет прав на массовое редактирование'}, status=403)
 
     columns = table.columns.all()
 
@@ -692,6 +725,7 @@ def table_detail(request, pk):
     return render(request, 'tables/table_detail.html', {
         'table_obj': table_obj,
         'table': table,
+        'mass_permissions': True,
         'filials': filials,
         'is_admin': table_obj.is_admin(request.user),
         'search_query': search_query
@@ -721,6 +755,7 @@ def shared_table_view(request, share_token):
         'table_obj': table,
         'table': table_view,
         'filials': filials,
+        'mass_permissions': table.has_mass_edit_permission(request.user),
         'is_owner': table.owner == request.user,
         'is_admin': table.is_admin(request.user),
         'is_add_permission': True if filials else False,

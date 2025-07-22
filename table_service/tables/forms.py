@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
 from django.utils.safestring import mark_safe
 
-from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission, UserFilial
+from .models import Table, Column, Cell, Filial, TablePermission, TableFilialPermission, UserFilial, MassPermission
 
 
 class TableForm(forms.ModelForm):
@@ -142,6 +142,28 @@ class TableFilialPermissionForm(forms.ModelForm):
                 'class': 'form-select'
             })
         }
+
+
+class UserMassEditForm(forms.ModelForm):
+    class Meta:
+        model = MassPermission
+        fields = ['user']
+
+
+class PermissionUserMassEditForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'userSelect'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        table = kwargs.pop('table', None)
+        super().__init__(*args, **kwargs)
+        if table:
+            self.fields['user'].queryset = User.objects.all()
 
 
 class UserFilialForm(forms.ModelForm):
