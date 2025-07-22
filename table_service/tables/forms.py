@@ -389,7 +389,7 @@ class RowMassEditForm(forms.Form):
         self.fields['filial'] = forms.ModelChoiceField(
             queryset=self.available_filials,
             label="Филиал",
-            required=True,
+            required=False,
             widget=forms.Select(attrs={
                 'class': 'form-select',
             }),

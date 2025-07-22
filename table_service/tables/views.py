@@ -68,10 +68,8 @@ def get_user_filials(request):
         return JsonResponse({'filials': []})
 
 
-def save_row_data(row, form, columns):
-    """Сохраняет данные строки из формы"""
-    for column in columns:
-        field_name = f'col_{column.id}'
+def save_row_data(row, form, columns, mass_redact=False):
+    def do_save():
         value = form.cleaned_data[field_name]
 
         # Для файловых полей
@@ -106,6 +104,14 @@ def save_row_data(row, form, columns):
                 column=column,
                 defaults={'value': value}
             )
+    """Сохраняет данные строки из формы"""
+    for column in columns:
+        field_name = f'col_{column.id}'
+        if not mass_redact:
+            do_save()
+        else:
+            if field_name in form.cleaned_data and form.cleaned_data[field_name] not in [None, '', []]:
+                do_save()
 
 
 @login_required
@@ -450,7 +456,7 @@ def mass_delete_row(request, table_pk):
     table = get_object_or_404(Table, pk=table_pk)
     row_ids = request.POST.getlist('row_ids[]')
     if not row_ids:
-        return JsonResponse({'status': 'error', 'message': 'Нет строк для редактирования'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'Нет строк для удаления'}, status=400)
 
     for row in row_ids:
         row = Row.objects.get(id=row)
@@ -493,12 +499,13 @@ def mass_edit_row(request, table_pk):
             if form.is_valid():
                 for row in row_ids:
                     row = Row.objects.get(id=row)
-                    save_row_data(row, form, columns)
+                    save_row_data(row, form, columns, mass_redact=True)
                     row.updated_by = request.user
                     row.last_date = datetime.datetime.now()
                     selected_filial = form.cleaned_data['filial']
-                    row.filial = selected_filial
-                    row.created_by = request.user
+                    if selected_filial:
+                        row.filial = selected_filial
+                        row.created_by = request.user
                     row.save()
                 messages.success(request, 'Строки успешно отредактированы!')
                 return JsonResponse({'status': 'success'})
