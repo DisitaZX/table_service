@@ -380,12 +380,140 @@ class AddRowForm(forms.Form):
                     )
 
 
+class RowMassEditForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        self.columns = kwargs.pop('columns', None)
+        self.available_filials = kwargs.pop('available_filials', None)
+        super().__init__(*args, **kwargs)
+
+        self.fields['filial'] = forms.ModelChoiceField(
+            queryset=self.available_filials,
+            label="Филиал",
+            required=True,
+            widget=forms.Select(attrs={
+                'class': 'form-select',
+            }),
+        )
+        for column in self.columns:
+            field_name = f'col_{column.id}'
+            required = column.is_required
+            if column.data_type == Column.ColumnType.INTEGER:
+                self.fields[field_name] = forms.IntegerField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.NumberInput(attrs={
+                        'class': 'form-control',
+                        'step': '1',
+                        'min': '-2147483648',
+                        'max': '2147483647',
+                        'placeholder': 'Введите целое число'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.POSITIVE_INTEGER:
+                self.fields[field_name] = forms.IntegerField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.NumberInput(attrs={
+                        'class': 'form-control',
+                        'step': '1',
+                        'min': '0',
+                        'max': '2147483647',
+                        'placeholder': 'Введите целое число больше 0'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.EMAIL:
+                self.fields[field_name] = forms.EmailField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.EmailInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Введите Email'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.CHOICE:
+                choices_list = column.choices if column.choices else []
+                choices = [(item, item) for item in choices_list]
+                self.fields[field_name] = forms.ChoiceField(
+                    label=column.name,
+                    required=required,
+                    choices=choices,
+                    widget=forms.Select(attrs={
+                        'class': 'form-control',
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.URL:
+                self.fields[field_name] = forms.URLField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.URLInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Введите ссылку'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.FILE:
+                self.fields[field_name] = forms.FileField(
+                    label=column.name,
+                    required=required,
+                    widget=FileInputWithPreview(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Загрузите файл'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.FLOAT:
+                self.fields[field_name] = forms.FloatField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.NumberInput(attrs={
+                        'class': 'form-control',
+                        'step': '0.01',
+                        'placeholder': 'Введите число с плавающей точкой'
+                    }),
+                )
+            elif column.data_type == Column.ColumnType.BOOLEAN:
+                self.fields[field_name] = forms.BooleanField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.CheckboxInput(attrs={
+                        'class': 'form-check-input'
+                    })
+                )
+            elif column.data_type == Column.ColumnType.DATE:
+                self.fields[field_name] = forms.DateField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.DateInput(attrs={
+                        'type': 'date',
+                        'class': 'form-control',
+                        'placeholder': 'Выберите дату'
+                    }),
+                )
+            else:  # TEXT по умолчанию
+                self.fields[field_name] = forms.CharField(
+                    label=column.name,
+                    required=required,
+                    widget=forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Введите текст'
+                    }),
+                )
+
+
 class RowEditForm(forms.Form):
     def __init__(self, *args, columns, **kwargs):
         self.row = kwargs.pop('row', None)
+        self.available_filials = kwargs.pop('available_filials', None)
         super().__init__(*args, **kwargs)
 
         if self.row:
+            self.fields['filial'] = forms.ModelChoiceField(
+                queryset=self.available_filials,
+                label="Филиал",
+                required=True,
+                widget=forms.Select(attrs={
+                    'class': 'form-select',
+                }),
+                initial=self.row.filial
+            )
             for column in columns:
                 cell = self.row.cells.filter(column=column).first()
                 if cell:
@@ -504,6 +632,24 @@ class RowEditForm(forms.Form):
                             'placeholder': 'Введите текст'
                         }),
                     )
+
+    def filial_changed(self):
+        """
+        Проверяет, изменилось ли значение поля filial по сравнению с начальным значением.
+        Возвращает True если значение изменилось, False если осталось таким же.
+        """
+        if not self.row:
+            return False
+
+        # Получаем текущее значение из cleaned_data (после валидации)
+        if 'filial' not in self.cleaned_data:
+            return False
+
+        current_value = self.cleaned_data['filial']
+        initial_value = self.row.filial
+
+        # Сравниваем текущее значение с начальным
+        return current_value != initial_value
 
 
 class AddFile(forms.Form):

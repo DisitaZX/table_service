@@ -1,0 +1,15 @@
+<form id="rowMassEditForm" method="post" action="{% url 'mass_edit_row' table_pk=table.pk %}">
+    {% csrf_token %}
+    <div class="modal-body">
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+            </div>
+        {% endfor %}
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+</form>

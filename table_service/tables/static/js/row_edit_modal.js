@@ -42,6 +42,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         }
+        if (e.target.closest('.mass-delete-row-btn')) {
+            const btn = e.target.closest('.mass-delete-row-btn');
+            const rowIds = Array.from(document.querySelectorAll('input[name="row_ids[]"]')).map(input => input.value);
+            const tableId = btn.dataset.tableId;
+            if (confirm('Вы уверены, что хотите удалить эти строки?')) {
+                const formData = new FormData();
+                rowIds.forEach(id => {
+                    formData.append('row_ids[]', id);
+                });
+
+                fetch(`/${tableId}/mass_delete_row/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Произошла ошибка при удалении');
+                });
+            }
+        }
         if (e.target.closest('.add-row-btn')) {
             const btn = e.target.closest('.add-row-btn');
             const tableId = btn.dataset.tableId;
@@ -137,77 +169,164 @@ document.addEventListener('DOMContentLoaded', function() {
 
             modal.show();
         }
+
+        if (e.target.closest('.mass-edit-row-btn')) {
+            const btn = e.target.closest('.mass-edit-row-btn');
+            const tableId = btn.dataset.tableId;
+
+            const modal = new bootstrap.Modal(document.getElementById('rowMassEditModal'));
+            let isModalInitialized = false;
+
+            // Обработчик закрытия модалки
+            const handleModalClose = () => {
+                modal._element.removeEventListener('hidden.bs.modal', handleModalClose);
+            };
+
+            // Ждем полной инициализации модалки
+            modal._element.addEventListener('shown.bs.modal', function onShown() {
+                if (isModalInitialized) return;
+                isModalInitialized = true;
+
+                // Удаляем обработчик shown после первого срабатывания
+                modal._element.removeEventListener('shown.bs.modal', onShown);
+
+                // Добавляем обработчик закрытия
+                modal._element.addEventListener('hidden.bs.modal', handleModalClose);
+
+                // Загрузка формы только после инициализации модалки
+                fetch(`/${tableId}/mass_edit_row/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById('modalMassContent').innerHTML = data.html;
+                        } else if (data.status === 'error'){
+                            alert(data.message);
+                            modal.hide();
+                        } else {
+                            alert('Ошибка загрузки формы');
+                            modal.hide();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        modal.hide();
+                    });
+            });
+
+            modal.show();
+        }
     });
 
     // Обработка отправки формы
     document.addEventListener('submit', function(e) {
-    if (e.target && e.target.id === 'addRowForm') {
-        e.preventDefault();
-        const form = e.target;
-        const submitBtn = form.querySelector('button[type="submit"]');
+        if (e.target && e.target.id === 'rowMassEditForm') {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const rowIds = Array.from(document.querySelectorAll('input[name="row_ids[]"]')).map(input => input.value);
 
-        // Блокируем кнопку на время отправки
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+            // Блокируем кнопку на время отправки
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
 
-        fetch(form.action, {
-            method: 'POST',
-            body: new FormData(form),
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('addRowModal')).hide();
-                window.location.reload(); // Обновляем таблицу
-            } else {
-                alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Ошибка соединения');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Сохранить';
+            const formData = new FormData(form);
+            rowIds.forEach(id => {
+                formData.append('row_ids[]', id);
+            });
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('rowMassEditModal')).hide();
+                    window.location.reload(); // Или обновление только строки
+                } else {
+                    alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка соединения');
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
             });
         }
 
-    if (e.target && e.target.id === 'rowEditForm') {
-        e.preventDefault();
-        const form = e.target;
-        const submitBtn = form.querySelector('button[type="submit"]');
+        if (e.target && e.target.id === 'addRowForm') {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
 
-        // Блокируем кнопку на время отправки
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+            // Блокируем кнопку на время отправки
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
 
-        fetch(form.action, {
-            method: 'POST',
-            body: new FormData(form),
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('addRowModal')).hide();
+                    window.location.reload(); // Обновляем таблицу
+                } else {
+                    alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка соединения');
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
+                });
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('rowEditModal')).hide();
-                window.location.reload(); // Или обновление только строки
-            } else {
-                alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Ошибка соединения');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Сохранить';
+
+        if (e.target && e.target.id === 'rowEditForm') {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Блокируем кнопку на время отправки
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('rowEditModal')).hide();
+                    window.location.reload(); // Или обновление только строки
+                } else {
+                    alert('Ошибка сохранения: ' + (data.message || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка соединения');
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
             });
         }
     });

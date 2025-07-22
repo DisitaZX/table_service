@@ -82,6 +82,35 @@
     <a href="{{ table.get_reset_filters_url }}" class="btn btn-sm btn-outline-secondary mb-3">
         <i class="bi bi-funnel"> Сбросить все фильтры</i>
     </a>
+    {% with filter_params=request.GET.urlencode %}
+        {% if "filter" in filter_params %}
+            <div class="dropdown">
+                <!-- Основная кнопка -->
+                <a href="#" class="btn btn-sm btn-outline-secondary mb-3 dropdown-toggle"
+                   id="MassEditDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-pencil-square"> Редактировать выбранные фильтром</i>
+                </a>
+
+                <!-- Выпадающее меню -->
+                <ul class="dropdown-menu" aria-labelledby="MassEditDropdown">
+                    {% for row in table.rows %}
+                        <input type="hidden" name="row_ids[]" value="{{ row.record.id }}">
+                    {% endfor %}
+                    <li>
+                        <a class="dropdown-item mass-edit-row-btn"
+                           data-table-id="{{ table_obj.pk }}">
+                            <!-- Передаём ID всех видимых строк -->
+                            Редактировать выбранные строки
+                        </a>
+                        <a class="dropdown-item mass-delete-row-btn"
+                           data-table-id="{{ table_obj.pk }}">
+                            Удалить выбранные строки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
+    {% endwith %}
     {% render_table table %}
 </div>
 <!-- Модальное окно добавления строки -->
@@ -106,6 +135,19 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div id="modalContent">
+                <!-- Форма будет загружена через AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="rowMassEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Массовое редактирование строк</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div id="modalMassContent">
                 <!-- Форма будет загружена через AJAX -->
             </div>
         </div>

@@ -20,7 +20,7 @@ from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission,
     TableFilialPermission, Admin, UserFilial, Profile
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
     TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm, AddFile, \
-    ColumnTypeImportForm, TableEditForm
+    ColumnTypeImportForm, TableEditForm, RowMassEditForm
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -445,6 +445,26 @@ def delete_row(request, table_pk, row_pk):
                                                                           kwargs={'share_token': table.share_token})})
 
 
+@login_required
+def mass_delete_row(request, table_pk):
+    table = get_object_or_404(Table, pk=table_pk)
+    row_ids = request.POST.getlist('row_ids[]')
+    if not row_ids:
+        return JsonResponse({'status': 'error', 'message': 'Нет строк для редактирования'}, status=400)
+
+    for row in row_ids:
+        row = Row.objects.get(id=row)
+        row.delete()
+
+    messages.success(request, 'Строки успешно удалены')
+
+    if request.user == table.owner:
+        return JsonResponse({'status': 'success', 'redirect_url': reverse('table_detail', kwargs={'pk': table.pk})})
+    else:
+        return JsonResponse({'status': 'success', 'redirect_url': reverse('shared_table_view',
+                                                                          kwargs={'share_token': table.share_token})})
+
+
 @require_POST
 @login_required
 def unlock_row_api(request, row_pk):
@@ -452,6 +472,46 @@ def unlock_row_api(request, row_pk):
     if unlock_row(row, request.user):
         return JsonResponse({'status': 'success'})
     return JsonResponse({'status': 'error'}, status=400)
+
+
+@login_required
+def mass_edit_row(request, table_pk):
+    table = get_object_or_404(Table, pk=table_pk)
+    #if not row.has_edit_permission(request.user):
+        #return JsonResponse({'status': 'error', 'message': 'Нет прав на редактирование'}, status=403)
+
+    columns = table.columns.all()
+
+    available_filials = get_available_filials_for_adding(request.user, table)
+
+    if request.method == 'POST':
+        with transaction.atomic():
+            row_ids = request.POST.getlist('row_ids[]')
+            if not row_ids:
+                return JsonResponse({'status': 'error', 'message': 'Нет строк для редактирования'}, status=400)
+            form = RowMassEditForm(request.POST, request.FILES, columns=columns, available_filials=available_filials)
+            if form.is_valid():
+                for row in row_ids:
+                    row = Row.objects.get(id=row)
+                    save_row_data(row, form, columns)
+                    row.updated_by = request.user
+                    row.last_date = datetime.datetime.now()
+                    selected_filial = form.cleaned_data['filial']
+                    row.filial = selected_filial
+                    row.created_by = request.user
+                    row.save()
+                messages.success(request, 'Строки успешно отредактированы!')
+                return JsonResponse({'status': 'success'})
+            errors = [error_list[0] for field, error_list in form.errors.items()]
+            return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
+
+    # GET запрос - возвращаем форму
+    form = RowMassEditForm(columns=columns, available_filials=available_filials)
+    html = render_to_string('tables/row_edit_form/row_mass_edit_form.html', {
+        'form': form,
+        'table': table,
+    }, request=request)
+    return JsonResponse({'status': 'success', 'html': html})
 
 
 @login_required
@@ -463,14 +523,20 @@ def edit_row(request, table_pk, row_pk):
 
     columns = table.columns.all()
 
+    available_filials = get_available_filials_for_adding(request.user, table)
+
     if request.method == 'POST':
-        form = RowEditForm(request.POST, request.FILES, row=row, columns=columns)
+        form = RowEditForm(request.POST, request.FILES, row=row, columns=columns, available_filials=available_filials)
         if form.is_valid():
             # Снимаем блокировку после успешного редактирования
             unlock_row(row, request.user)
             save_row_data(row, form, columns)
             row.updated_by = request.user
             row.last_date = datetime.datetime.now()
+            if 'filial' in form.changed_data:
+                selected_filial = form.cleaned_data['filial']
+                row.filial = selected_filial
+                row.created_by = request.user
             row.save()
             messages.success(request, 'Строка успешно отредактирована!')
             return JsonResponse({'status': 'success'})
@@ -485,7 +551,7 @@ def edit_row(request, table_pk, row_pk):
         }, status=423)  # 423 - Locked
 
     # GET запрос - возвращаем форму
-    form = RowEditForm(row=row, columns=columns)
+    form = RowEditForm(row=row, columns=columns, available_filials=available_filials)
     html = render_to_string('tables/row_edit_form/row_edit_form.html', {
         'form': form,
         'table': table,
