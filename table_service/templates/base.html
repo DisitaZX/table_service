@@ -9,7 +9,7 @@
 
     <!-- Bootstrap CSS -->
     <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
-
+    <link href="{% static 'css/bootstrap-icons.css' %}" rel="stylesheet">
     <!-- Подключение иконок Font Awesome -->
     <link href="{% static 'css/all.min.css' %}" rel="stylesheet">
 
@@ -73,13 +73,13 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 {% if user.is_superuser %}
-                                    <li><a class="dropdown-item" href="{% url 'admin:index' %}">Админка</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-person-badge"></i> Админка</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                 {% endif %}
                                 <li>
                                     <form action="{% url 'logout' %}" method="post" class="d-inline">
                                         {% csrf_token %}
-                                        <button type="submit" class="dropdown-item">Выйти</button>
+                                        <button type="submit" class="dropdown-item"><i class="bi bi-door-open"></i> Выйти</button>
                                     </form>
                                 </li>
                             </ul>
