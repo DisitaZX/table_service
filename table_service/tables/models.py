@@ -576,6 +576,8 @@ class Cell(models.Model):
                         self.date_value = val
                     else:
                         self.date_value = None
+                elif isinstance(val, date):
+                    self.date_value = val
             else:
                 self.date_value = None
         else:  # TEXT

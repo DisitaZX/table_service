@@ -899,7 +899,7 @@ def import_table(request):
                         for header, item in row_x.items():
                             if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
                                 for column in list_of_columns:
-                                    if column.name == header:
+                                    if str(column.name) == str(header):
                                         break
                                 cell = Cell.objects.create(
                                     row=row,
