@@ -142,16 +142,16 @@ class DynamicTable(tables.Table):
                 attrs={
                     'td': {'class': 'text-center'}
                 },
-                orderable=False,
+                order_by='updated_by__profile__employee__secondname'
             )
 
             self.base_columns['update_date'] = tables.Column(
-                verbose_name=self.get_column_header('is_update_time'),
+                verbose_name=self.get_column_header('is_update_date'),
                 accessor=f'last_date',
                 attrs={
                     'td': {'class': 'text-center'}
                 },
-                orderable=False,
+                order_by='last_date'
             )
 
             self.base_columns['actions'] = tables.Column(
@@ -497,13 +497,13 @@ class DynamicTable(tables.Table):
             edit += format_html('<div class="d-flex mr-auto p-2">Филиал</div>')
         elif column == 'is_update_user':
             edit += format_html('<div class="d-flex mr-auto p-2">Обновивший пользователь</div>')
-        elif column == 'is_update_time':
+        elif column == 'is_update_date':
             edit += format_html('<div class="d-flex mr-auto p-2">Дата обновления</div>')
 
         sort_icon = self.render_sort_icon(column)
         if isinstance(column, Column):
             filter_icon = self.render_column_header(column)
-        elif column == 'is_update_time':
+        elif column == 'is_update_date':
             current_filter = None
             filter_icon = format_html(self._render_date_filter(column, current_filter))
         else:
@@ -542,11 +542,11 @@ class DynamicTable(tables.Table):
                 'asc_sort': 'update_user',
                 'desc_sort': '-update_user'
             }
-        elif column == 'is_update_time':
+        elif column == 'is_update_date':
             return {
-                'sort_field': 'update_time',
-                'asc_sort': 'update_time',
-                'desc_sort': '-update_time'
+                'sort_field': 'update_date',
+                'asc_sort': 'update_date',
+                'desc_sort': '-update_date'
             }
         return None
 

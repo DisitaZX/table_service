@@ -20,7 +20,7 @@ from .models import Table, Column, Row, Cell, Filial, Employee, TablePermission,
     TableFilialPermission, Admin, UserFilial, Profile, MassPermission
 from .forms import TableForm, ColumnForm, RowEditForm, AddRowForm, PermissionUserForm, PermissionFilialForm, \
     TablePermissionForm, TableFilialPermissionForm, PermissionUserFilialForm, UserFilialForm, ColumnEditForm, AddFile, \
-    ColumnTypeImportForm, TableEditForm, RowMassEditForm, UserMassEditForm, PermissionUserMassEditForm
+    ColumnTypeImportForm, TableEditForm, RowMassEditForm, UserMassEditForm, PermissionUserMassEditForm, AddNewRows
 from .service import unlock_row, lock_row
 from django.contrib import messages
 from django_tables2 import RequestConfig
@@ -891,6 +891,14 @@ def import_table(request):
                             ).first()
                             profile_updated = Profile.objects.filter(employee=employee_updated).first()
 
+                        if last_date:
+                            if isinstance(last_date, str):
+                                last_date = datetime.datetime.fromisoformat(last_date)
+                            elif isinstance(last_date, datetime.datetime):
+                                pass
+                            else:
+                                last_date = datetime.datetime.now()
+
                         row = Row.objects.create(
                             table=table,
                             order=table.rows.count(),
@@ -898,7 +906,7 @@ def import_table(request):
                             if filial else Filial.objects.get(id=request.user.profile.employee.id_filial),
                             created_by=profile_created.user if profile_created else request.user,
                             updated_by=profile_updated.user if profile_updated else request.user,
-                            last_date=datetime.datetime.fromisoformat(last_date) if last_date else datetime.datetime.now(),
+                            last_date=last_date if last_date else datetime.datetime.now(),
                         )
                         for header, item in row_x.items():
                             if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']:
@@ -920,10 +928,123 @@ def import_table(request):
                     return redirect('table_detail', pk=table.pk)
                 except Exception as e:
                     raise ValueError(e)
-        return redirect('import_table')
     else:
         form = AddFile()
     return render(request, 'tables/export/import_table.html', {'form': form})
+
+
+@login_required
+def import_new_rows(request, table_pk):
+    table = get_object_or_404(Table, pk=table_pk)
+    if request.method == 'POST':
+        with transaction.atomic():
+            if 'import_file' in request.FILES:
+                form = AddNewRows(request.POST, request.FILES)
+                if form.is_valid():
+                    import_file = form.cleaned_data['import_file']
+                    if import_file:
+                        try:
+                            dataset = ImportFile(import_file)
+                            headers = dataset.get_column_header()
+                            dataset = dataset.get_dataset_dict()
+                            if not headers:
+                                form.add_error('import_file',
+                                               f"Не найдено наименований столбцов в файле, попробуйте заполнить их в первой строчке файла"
+                                               )
+                                return render(request, 'tables/export/import_new_rows.html', {'form': form,
+                                                                                              'table': table})
+                            # Проверка на уникальность заголовков
+                            if len(headers) != len(set(headers)):
+                                duplicate_headers = [h for h in headers if headers.count(h) > 1]
+                                form.add_error('import_file',
+                                               f"Найдены повторяющиеся заголовки столбцов: {', '.join(set(duplicate_headers))}"
+                                               )
+                                return render(request, 'tables/export/import_new_rows.html', {'form': form,
+                                                                                              'table': table})
+
+                            column_names = list(table.columns.all().values_list('name', flat=True))
+
+                            for header in headers:
+                                if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления']\
+                                        and header not in column_names:
+                                    form.add_error('import_file',
+                                                   f"Имена столбцов не совпадают с исходной таблицей"
+                                                   )
+                                    return render(request, 'tables/export/import_new_rows.html', {'form': form,
+                                                                                                  'table': table})
+
+                            list_of_columns = table.columns.all()
+
+                            for i, row_x in enumerate(dataset, 1):
+                                filial = None
+                                created_by = None
+                                updated_by = None
+                                last_date = None
+                                try:
+                                    filial = row_x['Филиал']
+                                    created_by = row_x['Пользователь']
+                                    updated_by = row_x['Обновивший пользователь']
+                                    last_date = row_x['Дата обновления']
+                                except KeyError:
+                                    pass
+
+                                profile_created = None
+                                if created_by:
+                                    created_by = created_by.split()
+
+                                    employee_created = Employee.objects.filter(
+                                        secondname=created_by[0],
+                                        firstname=created_by[1],
+                                        lastname=created_by[2]
+                                    ).first()
+                                    profile_created = Profile.objects.filter(employee=employee_created).first()
+
+                                profile_updated = None
+                                if updated_by:
+                                    updated_by = updated_by.split()
+                                    employee_updated = Employee.objects.filter(
+                                        secondname=updated_by[0],
+                                        firstname=updated_by[1],
+                                        lastname=updated_by[2]
+                                    ).first()
+                                    profile_updated = Profile.objects.filter(employee=employee_updated).first()
+                                if last_date:
+                                    if isinstance(last_date, str):
+                                        last_date = datetime.datetime.fromisoformat(last_date)
+                                    elif isinstance(last_date, datetime.datetime):
+                                        pass
+                                    else:
+                                        last_date = datetime.datetime.now()
+
+                                row = Row.objects.create(
+                                    table=table,
+                                    order=table.rows.count(),
+                                    filial=Filial.objects.get(name=filial)
+                                    if filial else Filial.objects.get(id=request.user.profile.employee.id_filial),
+                                    created_by=profile_created.user if profile_created else request.user,
+                                    updated_by=profile_updated.user if profile_updated else request.user,
+                                    last_date=last_date if last_date else datetime.datetime.now(),
+                                )
+
+                                for header, item in row_x.items():
+                                    if header not in ['Филиал', 'Пользователь', 'Обновивший пользователь',
+                                                      'Дата обновления']:
+                                        for column in list_of_columns:
+                                            if str(column.name) == str(header):
+                                                break
+                                        cell = Cell.objects.create(
+                                            row=row,
+                                            column=column
+                                        )
+                                        cell.value = item
+                                        cell.save()
+                            return redirect('table_detail', pk=table.pk)
+                        except Exception as e:
+                            raise ValueError(e)
+    else:
+        form = AddNewRows()
+    return render(request, 'tables/export/import_new_rows.html', {'form': form,
+                                                                  'table': table})
 
 
 @login_required
@@ -1236,26 +1357,6 @@ def filter_func(queryset, columns, request):
 
 
 def sort_func(queryset, columns):
-    queryset = queryset.annotate(
-        user_full_name=Concat(
-            F('created_by__profile__employee__secondname'),
-            Value(' '),
-            F('created_by__profile__employee__firstname'),
-            Value(' '),
-            F('created_by__profile__employee__lastname'),
-            output_field=TextField()
-        ),
-    )
-
-    queryset = queryset.annotate(
-        filial_name=Subquery(
-            Filial.objects.filter(
-                id=OuterRef('created_by__profile__employee__id_filial')
-            ).values('name')[:1],
-            output_field=TextField()  # Указываем тип поля явно
-        )
-    )
-
     for column in columns:
         queryset = Row.annotate_for_sorting(queryset, column.id, column.data_type)
     return queryset

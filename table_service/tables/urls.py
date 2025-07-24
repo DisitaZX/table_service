@@ -25,6 +25,7 @@ urlpatterns = [
     path('<int:table_pk>/manage_table_permissions/', views.manage_table_permissions, name='manage_table_permissions'),
     path('api/unlock_row/<int:row_pk>/', views.unlock_row_api, name='unlock_row_api'),
     path('admins/', views.manage_admins, name='manage_admins'),
+    path('<int:table_pk>/import_new_rows/', views.import_new_rows, name='import_new_rows'),
     path('<int:table_pk>/export/', views.export_table, name='export_table'),
     path('import_table/', views.import_table, name='import_table'),
     path('media/files/<str:name_file>', views.download_file, name='download_file'),

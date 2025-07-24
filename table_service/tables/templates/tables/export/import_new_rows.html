@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Импортировать новые строки в таблицу{% endblock %}
+
+{% block content %}
+<div id="upload-progress" style="display: none; text-align: center;">
+    <div class="spinner-border text-primary" role="status" style="display: inline-block;">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
+    <div style="margin-top: 10px;">
+        <small class="form-text text-muted">
+            Пожалуйста подождите, импортирование всей таблицы может занять некоторое время
+        </small>
+    </div>
+</div>
+
+<div id="form_input" class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="bi bi-file-earmark-plus-fill"></i> Импортировать новые строки в таблицу
+                </h4>
+            </div>
+            <div class="card-body">
+                <form id="types-form" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.import_file.id_for_label }}" class="form-label mt-3">
+                            {{ form.import_file.label }}
+                        </label>
+                        {{ form.import_file }}
+                        {% if form.import_file.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.import_file.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.import_file.help_text|linebreaksbr }}
+                        </small>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'table_detail' table.pk %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Добавляем класс form-control ко всем input в форме
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('id_import_file').classList.add('form-control');
+
+    const form_input = document.getElementById('form_input');
+    const form = document.getElementById('types-form');
+    const uploadProgress = document.getElementById('upload-progress');
+
+    form.addEventListener('submit', function() {
+        // Показываем индикатор загрузки
+        uploadProgress.style.display = 'block';
+        form_input.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

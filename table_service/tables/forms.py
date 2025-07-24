@@ -707,6 +707,21 @@ class AddFile(forms.Form):
         super().__init__(*args, **kwargs)
 
 
+class AddNewRows(forms.Form):
+    import_file = forms.FileField(
+            label="Импорт файла:",
+            required=True,
+            help_text="Поддерживаются следущие форматы: .csv, .xls, .xlsx.\n"
+                      "Колонки: 'Филиал', 'Пользователь', 'Обновивший пользователь', 'Дата обновления',"
+                      " являются сервисными.\n Если их не будет в таблице, то их значения у каждой строки будет эквивалентно вашей пользовательской карточке.",
+            validators=[FileExtensionValidator(allowed_extensions=['csv', 'xls', 'xlsx'],
+                                               message="Неверный формат файла!")]
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class ColumnTypeImportForm(forms.Form):
     TYPE_CHOICES = [
         ('text', 'Текст'),
