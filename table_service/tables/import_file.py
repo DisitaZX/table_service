@@ -1,5 +1,4 @@
 import tablib
-from django.core.validators import EmailValidator, URLValidator, FileExtensionValidator
 
 
 class ImportFile:
@@ -23,9 +22,3 @@ class ImportFile:
 
     def get_dataset_dict(self):
         return self.my_dataset.dict
-
-    def get_type_of_columns(self):
-        types_of_columns = []
-        for x_row in self.my_dataset.dict:
-            for head, value in x_row.items():
-                print(head, value)

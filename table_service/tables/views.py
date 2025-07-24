@@ -125,17 +125,18 @@ def table_list(request):
 
 @login_required
 def create_table(request):
-    if request.method == 'POST':
-        form = TableForm(request.POST)
-        if form.is_valid():
-            table = form.save(commit=False)
-            table.owner = request.user
-            table.created_at = datetime.datetime.now()
-            table.save()
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = TableForm(request.POST)
+            if form.is_valid():
+                table = form.save(commit=False)
+                table.owner = request.user
+                table.created_at = datetime.datetime.now()
+                table.save()
 
-            return redirect('table_detail', pk=table.pk)
-    else:
-        form = TableForm()
+                return redirect('table_detail', pk=table.pk)
+        else:
+            form = TableForm()
     return render(request, 'tables/create_table.html', {'form': form})
 
 
@@ -145,16 +146,16 @@ def edit_table(request, pk):
     # Проверка прав (только владелец может переименовывать таблицу)
     if not (table.owner == request.user or table.is_admin(request.user)):
         return HttpResponseForbidden("Вы не можете редактировать параметры этой таблицы")
-
-    if request.method == 'POST':
-        form = TableEditForm(request.POST, instance=table)
-        if form.is_valid():
-            with transaction.atomic():
-                form.save()
-                messages.success(request, f'Таблица успешно обновлена')
-                return redirect('table_list')
-    else:
-        form = TableEditForm(instance=table)
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = TableEditForm(request.POST, instance=table)
+            if form.is_valid():
+                with transaction.atomic():
+                    form.save()
+                    messages.success(request, f'Таблица успешно обновлена')
+                    return redirect('table_list')
+        else:
+            form = TableEditForm(instance=table)
     return render(request, 'tables/edit_table.html', {'form': form, 'table': table})
 
 
@@ -179,11 +180,10 @@ def add_column(request, pk):
     # Проверка прав (только владелец может добавлять колонки)
     if not (table.owner == request.user or table.is_admin(request.user)):
         return HttpResponseForbidden("Вы не можете добавлять колонки в эту таблицу")
-
-    if request.method == 'POST':
-        form = ColumnForm(request.POST, table=table)
-        if form.is_valid():
-            with transaction.atomic():
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = ColumnForm(request.POST, table=table)
+            if form.is_valid():
                 column = form.save(commit=False)
                 column.table = table
                 column.order = table.columns.count()
@@ -191,8 +191,8 @@ def add_column(request, pk):
 
                 messages.success(request, f'Колонка "{column.name}" успешно добавлена')
                 return redirect('table_detail', pk=table.pk)
-    else:
-        form = ColumnForm(table=table)
+        else:
+            form = ColumnForm(table=table)
     return render(request, 'tables/add_column/add_column.html', {'form': form, 'table': table})
 
 
@@ -204,15 +204,15 @@ def edit_column(request, pk, column_pk):
     if not (table.owner == request.user or table.is_admin(request.user)):
         return HttpResponseForbidden("Вы не можете добавлять колонки в эту таблицу")
 
-    if request.method == 'POST':
-        form = ColumnEditForm(request.POST, instance=column, table=table)
-        if form.is_valid():
-            with transaction.atomic():
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = ColumnEditForm(request.POST, instance=column, table=table)
+            if form.is_valid():
                 form.save()
                 messages.success(request, f'Колонка успешно обновлена')
                 return redirect('table_detail', pk=table.pk)
-    else:
-        form = ColumnEditForm(instance=column, table=table)
+        else:
+            form = ColumnEditForm(instance=column, table=table)
     return render(request, 'tables/add_column/edit_column.html', {'form': form, 'table': table, 'column': column})
 
 
@@ -452,9 +452,9 @@ def delete_column(request, table_pk, column_pk):
     # Проверка прав
     if not (table.owner == request.user or table.is_admin(request.user)):
         return HttpResponseForbidden("Вы не можете удалять колонки из этой таблицы")
-
-    Cell.objects.filter(column=column).delete()
-    column.delete()
+    with transaction.atomic():
+        Cell.objects.filter(column=column).delete()
+        column.delete()
 
     messages.success(request, f'Колонка "{column.name}" успешно удалена')
     return redirect('table_detail', pk=table.pk)
@@ -489,10 +489,10 @@ def mass_delete_row(request, table_pk):
 
     if not row_ids:
         return JsonResponse({'status': 'error', 'message': 'Нет строк для удаления'}, status=400)
-
-    for row in row_ids:
-        row = Row.objects.get(id=row)
-        row.delete()
+    with transaction.atomic():
+        for row in row_ids:
+            row = Row.objects.get(id=row)
+            row.delete()
 
     messages.success(request, 'Строки успешно удалены')
 
@@ -564,24 +564,24 @@ def edit_row(request, table_pk, row_pk):
     columns = table.columns.all()
 
     available_filials = get_available_filials_for_adding(request.user, table)
-
-    if request.method == 'POST':
-        form = RowEditForm(request.POST, request.FILES, row=row, columns=columns, available_filials=available_filials)
-        if form.is_valid():
-            # Снимаем блокировку после успешного редактирования
-            unlock_row(row, request.user)
-            save_row_data(row, form, columns)
-            row.updated_by = request.user
-            row.last_date = datetime.datetime.now()
-            if 'filial' in form.changed_data:
-                selected_filial = form.cleaned_data['filial']
-                row.filial = selected_filial
-                row.created_by = request.user
-            row.save()
-            messages.success(request, 'Строка успешно отредактирована!')
-            return JsonResponse({'status': 'success'})
-        errors = [error_list[0] for field, error_list in form.errors.items()]
-        return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = RowEditForm(request.POST, request.FILES, row=row, columns=columns, available_filials=available_filials)
+            if form.is_valid():
+                # Снимаем блокировку после успешного редактирования
+                unlock_row(row, request.user)
+                save_row_data(row, form, columns)
+                row.updated_by = request.user
+                row.last_date = datetime.datetime.now()
+                if 'filial' in form.changed_data:
+                    selected_filial = form.cleaned_data['filial']
+                    row.filial = selected_filial
+                    row.created_by = request.user
+                row.save()
+                messages.success(request, 'Строка успешно отредактирована!')
+                return JsonResponse({'status': 'success'})
+            errors = [error_list[0] for field, error_list in form.errors.items()]
+            return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
 
     lock, lock_user = lock_row(row, request.user)
     if not lock:
@@ -610,37 +610,37 @@ def add_row(request, pk):
     columns = table.columns.all()
 
     available_filials = get_available_filials_for_adding(request.user, table)
-
-    if request.method == 'POST':
-        form = AddRowForm(request.POST, request.FILES, table=table, columns=columns, user=request.user,
-                          available_filials=available_filials)
-        if form.is_valid():
-            selected_filial = form.cleaned_data['filial']
-            # Создаем новую строку
-            row = Row.objects.create(
-                table=table,
-                order=table.rows.count(),  # Порядковый номер новой строки
-                filial=selected_filial,
-                created_by=request.user,
-                updated_by=request.user,
-                last_date=datetime.datetime.now()
-            )
-
-            # Заполняем ячейки данными из формы
-            for column in columns:
-                field_name = f'col_{column.id}'
-                value = form.cleaned_data.get(field_name)
-
-                Cell.objects.create(
-                    row=row,
-                    column=column,
-                    value=value
+    with transaction.atomic():
+        if request.method == 'POST':
+            form = AddRowForm(request.POST, request.FILES, table=table, columns=columns, user=request.user,
+                              available_filials=available_filials)
+            if form.is_valid():
+                selected_filial = form.cleaned_data['filial']
+                # Создаем новую строку
+                row = Row.objects.create(
+                    table=table,
+                    order=table.rows.count(),  # Порядковый номер новой строки
+                    filial=selected_filial,
+                    created_by=request.user,
+                    updated_by=request.user,
+                    last_date=datetime.datetime.now()
                 )
 
-            messages.success(request, 'Новая строка успешно добавлена')
-            return JsonResponse({'status': 'success'})
-        errors = [error_list[0] for field, error_list in form.errors.items()]
-        return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
+                # Заполняем ячейки данными из формы
+                for column in columns:
+                    field_name = f'col_{column.id}'
+                    value = form.cleaned_data.get(field_name)
+
+                    Cell.objects.create(
+                        row=row,
+                        column=column,
+                        value=value
+                    )
+
+                messages.success(request, 'Новая строка успешно добавлена')
+                return JsonResponse({'status': 'success'})
+            errors = [error_list[0] for field, error_list in form.errors.items()]
+            return JsonResponse({'status': 'error', 'message': errors[0]}, status=400)
 
     # GET запрос - возвращаем форму
     form = AddRowForm(table=table, user=request.user, columns=columns, available_filials=available_filials)
