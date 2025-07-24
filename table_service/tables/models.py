@@ -524,9 +524,15 @@ class Cell(models.Model):
     def value(self, val):
         """Устанавливает значение в правильное поле"""
         if self.column.data_type == Column.ColumnType.INTEGER:
-            self.integer_value = int(val) if val is not None else None
+            try:
+                self.integer_value = int(val) if val is not None else None
+            except ValueError:
+                self.integer_value = None
         elif self.column.data_type == Column.ColumnType.POSITIVE_INTEGER:
-            self.positive_integer_value = int(val) if val is not None else None
+            try:
+                self.positive_integer_value = int(val) if val is not None else None
+            except ValueError:
+                self.positive_integer_value = None
         elif self.column.data_type == Column.ColumnType.EMAIL:
             if val is not None:
                 validator = EmailValidator()
@@ -548,7 +554,6 @@ class Cell(models.Model):
             else:
                 self.url_value = None
         elif self.column.data_type == Column.ColumnType.FILE:
-            #validators = [FileExtensionValidator(allowed_extensions=['pdf', 'docx'])]
             if val is not None:
                 try:
                     if isinstance(val, (UploadedFile, InMemoryUploadedFile)):
@@ -560,9 +565,15 @@ class Cell(models.Model):
             else:
                 self.file_value = None
         elif self.column.data_type == Column.ColumnType.FLOAT:
-            self.float_value = float(val) if val is not None else None
+            try:
+                self.float_value = float(val) if val is not None else None
+            except ValueError:
+                self.float_value = None
         elif self.column.data_type == Column.ColumnType.BOOLEAN:
-            self.boolean_value = bool(val) if val is not None else None
+            try:
+                self.boolean_value = bool(val) if val is not None else None
+            except ValueError:
+                self.boolean_value = None
         elif self.column.data_type == Column.ColumnType.CHOICE:
             self.choice_value = val if val is not None else None
         elif self.column.data_type == Column.ColumnType.DATE:
@@ -584,7 +595,10 @@ class Cell(models.Model):
             else:
                 self.date_value = None
         else:  # TEXT
-            self.text_value = str(val) if val is not None else ''
+            try:
+                self.text_value = str(val) if val is not None else ''
+            except ValueError:
+                self.text_value = None
 
     def __str__(self):
         return f"{self.row} - {self.column}: {self.value}"
