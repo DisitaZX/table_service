@@ -320,6 +320,7 @@ class AddRowForm(forms.Form):
                 elif column.data_type == Column.ColumnType.CHOICE:
                     choices_list = column.choices if column.choices else []
                     choices = [(item, item) for item in choices_list]
+                    choices.append(('', '---------'))
                     self.fields[field_name] = forms.ChoiceField(
                         label=column.name,
                         required=required,
@@ -418,11 +419,10 @@ class RowMassEditForm(forms.Form):
         )
         for column in self.columns:
             field_name = f'col_{column.id}'
-            required = column.is_required
             if column.data_type == Column.ColumnType.INTEGER:
                 self.fields[field_name] = forms.IntegerField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.NumberInput(attrs={
                         'class': 'form-control',
                         'step': '1',
@@ -434,7 +434,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.POSITIVE_INTEGER:
                 self.fields[field_name] = forms.IntegerField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.NumberInput(attrs={
                         'class': 'form-control',
                         'step': '1',
@@ -446,7 +446,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.EMAIL:
                 self.fields[field_name] = forms.EmailField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.EmailInput(attrs={
                         'class': 'form-control',
                         'placeholder': 'Введите Email'
@@ -455,9 +455,10 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.CHOICE:
                 choices_list = column.choices if column.choices else []
                 choices = [(item, item) for item in choices_list]
+                choices.append(('', '---------'))
                 self.fields[field_name] = forms.ChoiceField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     choices=choices,
                     widget=forms.Select(attrs={
                         'class': 'form-control',
@@ -466,7 +467,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.URL:
                 self.fields[field_name] = forms.URLField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.URLInput(attrs={
                         'class': 'form-control',
                         'placeholder': 'Введите ссылку'
@@ -475,7 +476,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.FILE:
                 self.fields[field_name] = forms.FileField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=FileInputWithPreview(attrs={
                         'class': 'form-control',
                         'placeholder': 'Загрузите файл'
@@ -484,7 +485,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.FLOAT:
                 self.fields[field_name] = forms.FloatField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.NumberInput(attrs={
                         'class': 'form-control',
                         'step': '0.01',
@@ -494,7 +495,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.BOOLEAN:
                 self.fields[field_name] = forms.BooleanField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.CheckboxInput(attrs={
                         'class': 'form-check-input'
                     })
@@ -502,7 +503,7 @@ class RowMassEditForm(forms.Form):
             elif column.data_type == Column.ColumnType.DATE:
                 self.fields[field_name] = forms.DateField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.DateInput(attrs={
                         'type': 'date',
                         'class': 'form-control',
@@ -512,7 +513,7 @@ class RowMassEditForm(forms.Form):
             else:  # TEXT по умолчанию
                 self.fields[field_name] = forms.CharField(
                     label=column.name,
-                    required=required,
+                    required=False,
                     widget=forms.TextInput(attrs={
                         'class': 'form-control',
                         'placeholder': 'Введите текст'
@@ -584,6 +585,7 @@ class RowEditForm(forms.Form):
                 elif column.data_type == Column.ColumnType.CHOICE:
                     choices_list = column.choices if column.choices else []
                     choices = [(item, item) for item in choices_list]
+                    choices.append(('', '---------'))
                     self.fields[field_name] = forms.ChoiceField(
                         label=column.name,
                         required=required,

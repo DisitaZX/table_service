@@ -802,7 +802,11 @@ def import_table(request):
 
                         dataset = ImportFile(import_file)
                         headers = dataset.get_column_header()
-
+                        if not headers:
+                            form.add_error('import_file',
+                                           f"Не найдено наименований столбцов в файле, попробуйте заполнить их в первой строчке файла"
+                                           )
+                            return render(request, 'tables/export/import_table.html', {'form': form})
                         # Проверка на уникальность заголовков
                         if len(headers) != len(set(headers)):
                             duplicate_headers = [h for h in headers if headers.count(h) > 1]
