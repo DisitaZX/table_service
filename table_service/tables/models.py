@@ -1,4 +1,5 @@
 import datetime
+import os
 
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
@@ -7,6 +8,8 @@ from django.core.validators import EmailValidator, URLValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.functions import Concat
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.db.models import IntegerField, FloatField, BooleanField, DateField, F, TextField, Value
@@ -653,3 +656,14 @@ class TableFilialLock(models.Model):
 
     class Meta:
         unique_together = ('table', 'filial')
+
+
+@receiver(pre_delete, sender=Cell)
+def delete_file_on_cell_delete(sender, instance, **kwargs):
+    """
+    Удаляет файл из файловой системы при удалении объекта Cell.
+    """
+    if instance.file_value:  # Если файл существует
+        file_path = instance.file_value.path
+        if os.path.exists(file_path):
+            os.remove(file_path)  # Удаляем файл
